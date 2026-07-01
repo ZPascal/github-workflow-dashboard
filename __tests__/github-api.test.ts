@@ -67,12 +67,14 @@ describe('GitHubApiClient', () => {
         documentation_url: 'https://docs.github.com/rest'
       };
 
-      mockFetch.mockResolvedValueOnce({
+      const mockResponse = {
         ok: false,
         status: 401,
-        json: jest.fn().mockResolvedValueOnce(errorResponse),
+        json: jest.fn().mockResolvedValue(errorResponse),
         headers: new Headers()
-      } as any);
+      } as any;
+      mockFetch.mockResolvedValueOnce(mockResponse);
+      mockFetch.mockResolvedValueOnce({ ...mockResponse, json: jest.fn().mockResolvedValue(errorResponse) });
 
       await expect(client.validateToken()).rejects.toThrow(GitHubApiError);
       await expect(client.validateToken()).rejects.toThrow('Bad credentials');
@@ -306,6 +308,12 @@ describe('GitHubApiClient', () => {
     });
 
     it('should handle JSON parsing errors in error responses', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: jest.fn().mockRejectedValueOnce(new Error('Invalid JSON')),
+        headers: new Headers()
+      } as any);
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,

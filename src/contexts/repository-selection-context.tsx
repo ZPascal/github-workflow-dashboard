@@ -54,7 +54,7 @@ interface RepositorySelectionProviderProps {
 }
 
 export function RepositorySelectionProvider({ children }: RepositorySelectionProviderProps) {
-  const { token, isValidated, userId } = useGitHubToken();
+  const { token, isValidated, userId, baseUrl } = useGitHubToken();
   const [selectedRepositories, setSelectedRepositoriesState] = useState<RepositoryWithWorkflowStatus[]>([]);
   const [availableRepositories, setAvailableRepositories] = useState<RepositoryWithWorkflowStatus[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -203,7 +203,7 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
     setLoadingStatus('Fetching repositories...');
 
     try {
-      const apiClient = new GitHubApiClient(token);
+      const apiClient = new GitHubApiClient(token, baseUrl);
       const allRepositories: Repository[] = [];
       let page = 1;
       const perPage = 100;
@@ -254,7 +254,7 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
       setIsLoading(false);
       setLoadingStatus(null);
     }
-  }, [token, isValidated, selectedOrganization, userId, checkWorkflowsInBackground, organizations]);
+  }, [token, isValidated, selectedOrganization, userId, baseUrl, checkWorkflowsInBackground, organizations]);
 
   const toggleRepository = useCallback((repository: RepositoryWithWorkflowStatus) => {
     // Only allow toggling repositories with workflows
@@ -293,8 +293,8 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
     setIsLoadingOrganizations(true);
 
     try {
-      const apiClient = new GitHubApiClient(token);
-      
+      const apiClient = new GitHubApiClient(token, baseUrl);
+
       // Get user info first
       const user = await apiClient.validateToken();
       
@@ -325,7 +325,7 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
     } finally {
       setIsLoadingOrganizations(false);
     }
-  }, [token, isValidated, userId]);
+  }, [token, isValidated, userId, baseUrl]);
 
   const setSelectedOrganization = useCallback((org: string | null) => {
     setSelectedOrganizationState(org);

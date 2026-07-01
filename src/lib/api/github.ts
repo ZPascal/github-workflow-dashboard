@@ -17,12 +17,15 @@ export class GitHubApiError extends Error {
   }
 }
 
+export const GITHUB_DEFAULT_BASE_URL = 'https://api.github.com';
+
 export class GitHubApiClient {
-  private baseUrl = 'https://api.github.com';
+  private baseUrl: string;
   private token: string;
 
-  constructor(token: string) {
+  constructor(token: string, baseUrl?: string) {
     this.token = token;
+    this.baseUrl = (baseUrl || GITHUB_DEFAULT_BASE_URL).replace(/\/$/, '');
   }
 
   private async makeRequest<T>(

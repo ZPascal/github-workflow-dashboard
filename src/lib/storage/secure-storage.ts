@@ -10,6 +10,7 @@ export const STORAGE_KEYS = {
   SELECTED_REPOSITORIES: 'github_flow_dashboard_selected_repos',
   USER_PREFERENCES: 'github_flow_dashboard_preferences',
   LAST_SYNC: 'github_flow_dashboard_last_sync',
+  GITHUB_BASE_URL: 'github_flow_dashboard_base_url',
 } as const;
 
 // Helper to get localStorage reference that works in both browser and test environments
