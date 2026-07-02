@@ -67,19 +67,10 @@ export function GitHubTokenProvider({ children }: GitHubTokenProviderProps) {
         console.log('[GitHub Token Context] Stored token found:', !!storedToken);
 
         if (storedToken) {
+          const storedUserId = await getSecureItem(STORAGE_KEYS.GITHUB_USER_ID).catch(() => null);
+          if (storedUserId) setUserId(storedUserId);
           setTokenState(storedToken);
-          console.log('[GitHub Token Context] Validating stored token...');
-          const validation = await validateGitHubToken(storedToken, baseUrl);
-          console.log('[GitHub Token Context] Stored token validation result:', validation);
-
-          setIsValidated(validation.isValid);
-          if (!validation.isValid) {
-            console.warn('[GitHub Token Context] Stored token is no longer valid');
-            setError('Stored token is no longer valid');
-          } else {
-            const storedUserId = await getSecureItem(STORAGE_KEYS.GITHUB_USER_ID).catch(() => null);
-            if (storedUserId) setUserId(storedUserId);
-          }
+          setIsValidated(true);
           setIsLoading(false);
           return;
         }
