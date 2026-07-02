@@ -15,6 +15,7 @@ Github Workflow Dashboard is a web app for visualizing, monitoring, and managing
 - View workflow status and history for multiple repositories
 - Monitor recent runs and repository health
 - Manage GitHub tokens and settings
+- **GitHub Enterprise Server support** — configure a custom API base URL
 - Easy deployment options (npm, Docker, Vercel)
 
 ### Screenshots
@@ -33,6 +34,19 @@ Various filters and compact mode, mobile friendly
 
 ![Different Modes](./docs/modes.png)
 
+
+## GitHub Enterprise Server
+
+If your organization runs GitHub Enterprise Server (GHES), you can point the dashboard at your instance's API instead of `api.github.com`.
+
+1. Open **Settings** in the dashboard.
+2. Find the **GitHub API URL** card.
+3. Enter your instance's API base URL, e.g. `https://github.example.com/api/v3`.
+4. Click **Apply** — the dashboard will re-validate your token against the new endpoint.
+
+To revert to GitHub.com, click **Reset to default** in the same card.
+
+Your custom URL is stored locally in the browser alongside your token and persists across sessions.
 
 ## Quick Start
 
@@ -73,6 +87,6 @@ To stop and remove containers:
 docker-compose down
 ```
 
-### 4. Deploy with Vercel
+## Acknowledgements
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%cheney-yan-ifl%2Fgithub-workflow-dashboard)
+Based on the original work by [cheney-yan](https://github.com/cheney-yan/github-workflow-dashboard).

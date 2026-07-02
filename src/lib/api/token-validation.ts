@@ -18,9 +18,10 @@ export interface TokenValidationResult {
 /**
  * Validates a GitHub personal access token by making a test API call
  * @param token - GitHub personal access token
+ * @param baseUrl - Optional GitHub API base URL (for GitHub Enterprise Server)
  * @returns Promise<TokenValidationResult> - Validation result with user info or error
  */
-export async function validateGitHubToken(token: string): Promise<TokenValidationResult> {
+export async function validateGitHubToken(token: string, baseUrl?: string): Promise<TokenValidationResult> {
   if (!token || token.trim().length === 0) {
     return {
       isValid: false,
@@ -29,7 +30,7 @@ export async function validateGitHubToken(token: string): Promise<TokenValidatio
   }
 
   try {
-    const client = new GitHubApiClient(token);
+    const client = new GitHubApiClient(token, baseUrl);
     const user = await client.validateToken();
     
     return {

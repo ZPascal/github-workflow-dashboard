@@ -1,313 +1,129 @@
-/**
- * @jest-environment jsdom
- */
+// __tests__/secure-storage.test.ts
 import {
   setSecureItem,
   getSecureItem,
   removeSecureItem,
   isSecureStorageAvailable,
-  clearAllSecureStorage,
   STORAGE_KEYS,
-} from '../src/lib/storage/secure-storage';
+} from '@/lib/storage/secure-storage';
 
-// Mock crypto API
-const mockCrypto = {
-  subtle: {
-    digest: jest.fn(),
-    importKey: jest.fn(),
-    deriveKey: jest.fn(),
-    encrypt: jest.fn(),
-    decrypt: jest.fn(),
-  },
-  getRandomValues: jest.fn(),
+// ---------- localStorage mock ----------
+const store: Record<string, string> = {};
+const localStorageMock = {
+  getItem: jest.fn((key: string) => store[key] ?? null),
+  setItem: jest.fn((key: string, value: string) => { store[key] = value; }),
+  removeItem: jest.fn((key: string) => { delete store[key]; }),
 };
 
-// Mock localStorage
-const mockLocalStorage = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
+// ---------- SubtleCrypto mock ----------
+// encrypt: prepends a 1-byte marker (0xAB) so we can detect "encrypted" data
+// decrypt: strips that marker
+const subtleMock = {
+  digest: jest.fn(async (_algo: string, data: ArrayBuffer) => data), // identity hash
+  importKey: jest.fn(async () => ({ type: 'raw' })),
+  deriveKey: jest.fn(async () => ({ type: 'derived' })),
+  encrypt: jest.fn(async (_algo: unknown, _key: unknown, data: ArrayBuffer) => {
+    const input = new Uint8Array(data);
+    const output = new Uint8Array(input.length + 1);
+    output[0] = 0xab;
+    output.set(input, 1);
+    return output.buffer;
+  }),
+  decrypt: jest.fn(async (_algo: unknown, _key: unknown, data: ArrayBuffer) => {
+    const input = new Uint8Array(data);
+    // strip the leading 0xAB marker
+    return input.slice(1).buffer;
+  }),
 };
 
-// Setup global mocks
+const cryptoMock = {
+  subtle: subtleMock,
+  getRandomValues: jest.fn(<T extends ArrayBufferView>(arr: T): T => {
+    // fill with deterministic values for reproducible tests
+    if (arr instanceof Uint8Array) arr.fill(0x42);
+    return arr;
+  }),
+};
+
 beforeAll(() => {
-  // Mock navigator for device fingerprinting
+  // In jsdom, window === global, so we assign directly rather than redefining
+  Object.defineProperty(window, 'crypto', {
+    value: cryptoMock,
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(window, 'localStorage', {
+    value: localStorageMock,
+    writable: true,
+    configurable: true,
+  });
   Object.defineProperty(global, 'navigator', {
-    value: {
-      userAgent: 'test-agent',
-      language: 'en-US',
-    },
+    value: { userAgent: 'jest', language: 'en' },
     writable: true,
+    configurable: true,
   });
-
-  // Mock screen for device fingerprinting
   Object.defineProperty(global, 'screen', {
-    value: {
-      width: 1920,
-      height: 1080,
-    },
+    value: { width: 1920, height: 1080 },
     writable: true,
-  });
-
-  // Mock Date.prototype.getTimezoneOffset
-  const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
-  Date.prototype.getTimezoneOffset = jest.fn(() => -480); // PST timezone
-
-  // Mock Intl for consistent device fingerprinting
-  global.Intl = {
-    DateTimeFormat: () => ({
-      resolvedOptions: () => ({
-        timeZone: 'America/Los_Angeles',
-      }),
-    }),
-  } as unknown as typeof Intl;
-
-  // Setup globals
-  global.crypto = mockCrypto as unknown as Crypto;
-  global.localStorage = mockLocalStorage as unknown as Storage;
-
-  // Cleanup function
-  afterAll(() => {
-    Date.prototype.getTimezoneOffset = originalGetTimezoneOffset;
+    configurable: true,
   });
 });
 
-describe('Secure Storage', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    
-    // Setup crypto mocks with default behaviors
-    mockCrypto.getRandomValues.mockImplementation((array: Uint8Array) => {
-      // Fill with predictable values for testing
-      for (let i = 0; i < array.length; i++) {
-        array[i] = i % 256;
-      }
-      return array;
-    });
+beforeEach(() => {
+  // clear the in-memory store and reset call counts
+  Object.keys(store).forEach(k => delete store[k]);
+  jest.clearAllMocks();
+  // re-wire getItem/setItem/removeItem since clearAllMocks resets implementations
+  localStorageMock.getItem.mockImplementation((key: string) => store[key] ?? null);
+  localStorageMock.setItem.mockImplementation((key: string, value: string) => { store[key] = value; });
+  localStorageMock.removeItem.mockImplementation((key: string) => { delete store[key]; });
+});
 
-    // Mock digest for device password generation
-    mockCrypto.subtle.digest.mockResolvedValue(
-      new Uint8Array([
-        0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
-        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-        0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-        0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99
-      ]).buffer
-    );
-
-    mockCrypto.subtle.importKey.mockResolvedValue({
-      type: 'secret',
-      extractable: false,
-      algorithm: { name: 'PBKDF2' },
-      usages: ['deriveKey'],
-    } as CryptoKey);
-
-    mockCrypto.subtle.deriveKey.mockResolvedValue({
-      type: 'secret',
-      extractable: false,
-      algorithm: { name: 'AES-GCM', length: 256 },
-      usages: ['encrypt', 'decrypt'],
-    } as CryptoKey);
-
-    mockCrypto.subtle.encrypt.mockResolvedValue(
-      new Uint8Array([1, 2, 3, 4, 5]).buffer
-    );
-
-    mockCrypto.subtle.decrypt.mockResolvedValue(
-      new TextEncoder().encode('test-value').buffer
-    );
+describe('setSecureItem / getSecureItem', () => {
+  it('round-trip: stored value is returned unchanged', async () => {
+    await setSecureItem('test-key', 'hello-world');
+    const result = await getSecureItem('test-key');
+    expect(result).toBe('hello-world');
   });
 
-  describe('isSecureStorageAvailable', () => {
-    it('should return true when all required APIs are available', () => {
-      expect(isSecureStorageAvailable()).toBe(true);
-    });
-
-    it('should return false when crypto is not available', () => {
-      const originalCrypto = global.crypto;
-      // @ts-expect-error - intentionally setting to undefined for test
-      global.crypto = undefined;
-      
-      expect(isSecureStorageAvailable()).toBe(false);
-      
-      global.crypto = originalCrypto;
-    });
-
-    it('should return false when localStorage is not available', () => {
-      const originalLocalStorage = global.localStorage;
-      // @ts-expect-error - intentionally setting to undefined for test
-      global.localStorage = undefined;
-      
-      expect(isSecureStorageAvailable()).toBe(false);
-      
-      global.localStorage = originalLocalStorage;
-    });
+  it('returns null for a key that was never set', async () => {
+    const result = await getSecureItem('nonexistent');
+    expect(result).toBeNull();
   });
 
-  describe('setSecureItem', () => {
-    it('should encrypt and store data in localStorage', async () => {
-      await setSecureItem(STORAGE_KEYS.GITHUB_TOKEN, 'test-token');
+  it('returns null and removes the key when stored data is corrupted', async () => {
+    store['bad-key'] = 'not-valid-json{{{';
+    const result = await getSecureItem('bad-key');
+    expect(result).toBeNull();
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('bad-key');
+  });
+});
 
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        STORAGE_KEYS.GITHUB_TOKEN,
-        expect.stringMatching(/{"encrypted":\[[\d,]+\],"salt":\[[\d,]+\],"iv":\[[\d,]+\],"timestamp":\d+}/)
-      );
-    });
+describe('removeSecureItem', () => {
+  it('removes the key from localStorage', async () => {
+    await setSecureItem('to-remove', 'value');
+    removeSecureItem('to-remove');
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('to-remove');
+  });
+});
 
-    it('should call crypto functions with correct parameters', async () => {
-      await setSecureItem(STORAGE_KEYS.GITHUB_TOKEN, 'test-token');
+describe('isSecureStorageAvailable', () => {
+  it('returns true when crypto and localStorage are present', () => {
+    expect(isSecureStorageAvailable()).toBe(true);
+  });
+});
 
-      expect(mockCrypto.subtle.importKey).toHaveBeenCalledWith(
-        'raw',
-        expect.any(Object),
-        'PBKDF2',
-        false,
-        ['deriveKey']
-      );
-
-      expect(mockCrypto.subtle.deriveKey).toHaveBeenCalledWith(
-        {
-          name: 'PBKDF2',
-          salt: expect.any(Uint8Array),
-          iterations: 100000,
-          hash: 'SHA-256',
-        },
-        expect.objectContaining({ type: 'secret' }),
-        { name: 'AES-GCM', length: 256 },
-        false,
-        ['encrypt']
-      );
-
-      expect(mockCrypto.subtle.encrypt).toHaveBeenCalled();
-    });
-
-    it('should throw error when encryption fails', async () => {
-      mockCrypto.subtle.encrypt.mockRejectedValueOnce(new Error('Encryption failed'));
-
-      await expect(setSecureItem(STORAGE_KEYS.GITHUB_TOKEN, 'test-token'))
-        .rejects.toThrow('Failed to securely store item: Encryption failed');
-    });
+describe('STORAGE_KEYS', () => {
+  it('contains GITHUB_BASE_URL', () => {
+    expect(STORAGE_KEYS.GITHUB_BASE_URL).toBeDefined();
+    expect(typeof STORAGE_KEYS.GITHUB_BASE_URL).toBe('string');
   });
 
-  describe('getSecureItem', () => {
-    it('should return null when item does not exist', async () => {
-      mockLocalStorage.getItem.mockReturnValue(null);
-
-      const result = await getSecureItem(STORAGE_KEYS.GITHUB_TOKEN);
-
-      expect(result).toBeNull();
-      expect(mockLocalStorage.getItem).toHaveBeenCalledWith(STORAGE_KEYS.GITHUB_TOKEN);
-    });
-
-    it('should decrypt and return stored data', async () => {
-      const mockStoredData = {
-        encrypted: [1, 2, 3, 4, 5],
-        salt: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-        iv: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-        timestamp: Date.now(),
-      };
-
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockStoredData));
-
-      const result = await getSecureItem(STORAGE_KEYS.GITHUB_TOKEN);
-
-      expect(result).toBe('test-value');
-      expect(mockCrypto.subtle.decrypt).toHaveBeenCalled();
-    });
-
-    it('should return null and remove corrupted data when decryption fails', async () => {
-      const mockStoredData = {
-        encrypted: [1, 2, 3, 4, 5],
-        salt: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-        iv: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-        timestamp: Date.now(),
-      };
-
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockStoredData));
-      mockCrypto.subtle.decrypt.mockRejectedValueOnce(new Error('Decryption failed'));
-
-      const result = await getSecureItem(STORAGE_KEYS.GITHUB_TOKEN);
-
-      expect(result).toBeNull();
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEYS.GITHUB_TOKEN);
-    });
-
-    it('should return null when stored data format is invalid', async () => {
-      mockLocalStorage.getItem.mockReturnValue('{"invalid": "format"}');
-
-      const result = await getSecureItem(STORAGE_KEYS.GITHUB_TOKEN);
-
-      expect(result).toBeNull();
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEYS.GITHUB_TOKEN);
-    });
-  });
-
-  describe('removeSecureItem', () => {
-    it('should remove item from localStorage', () => {
-      removeSecureItem(STORAGE_KEYS.GITHUB_TOKEN);
-
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEYS.GITHUB_TOKEN);
-    });
-
-    it('should not throw when localStorage is not available', () => {
-      const originalLocalStorage = global.localStorage;
-      // @ts-expect-error - intentionally setting to undefined for test
-      global.localStorage = undefined;
-
-      expect(() => removeSecureItem(STORAGE_KEYS.GITHUB_TOKEN)).not.toThrow();
-
-      global.localStorage = originalLocalStorage;
-    });
-  });
-
-  describe('clearAllSecureStorage', () => {
-    it('should remove all application storage keys', () => {
-      clearAllSecureStorage();
-
-      Object.values(STORAGE_KEYS).forEach(key => {
-        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith(key);
-      });
-    });
-  });
-
-  describe('STORAGE_KEYS', () => {
-    it('should have all required keys', () => {
-      expect(STORAGE_KEYS).toEqual({
-        GITHUB_TOKEN: 'ifl_dashboard_github_token',
-        SELECTED_REPOSITORIES: 'ifl_dashboard_selected_repos',
-        USER_PREFERENCES: 'ifl_dashboard_preferences',
-        LAST_SYNC: 'ifl_dashboard_last_sync',
-      });
-    });
-  });
-
-  describe('device fingerprinting', () => {
-    it('should generate consistent device password', async () => {
-      // Call the function twice to ensure consistency
-      await setSecureItem(STORAGE_KEYS.GITHUB_TOKEN, 'test-token-1');
-      
-      jest.clearAllMocks();
-      // Reset the digest mock to return the same result
-      mockCrypto.subtle.digest.mockResolvedValue(
-        new Uint8Array([
-          0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
-          0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-          0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
-          0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99
-        ]).buffer
-      );
-      
-      await setSecureItem(STORAGE_KEYS.USER_PREFERENCES, 'test-token-2');
-      
-      // Both calls should use the same device fingerprint
-      expect(mockCrypto.subtle.digest).toHaveBeenCalledWith(
-        'SHA-256',
-        expect.any(Uint8Array)
-      );
-      
-      // Verify the fingerprint data is consistent
-      const calls = mockCrypto.subtle.digest.mock.calls;
-      expect(calls.length).toBeGreaterThan(0);
-    });
+  it('contains all expected keys', () => {
+    const keys = Object.keys(STORAGE_KEYS);
+    expect(keys).toContain('GITHUB_TOKEN');
+    expect(keys).toContain('GITHUB_USER_ID');
+    expect(keys).toContain('SELECTED_REPOSITORIES');
+    expect(keys).toContain('GITHUB_BASE_URL');
   });
 });

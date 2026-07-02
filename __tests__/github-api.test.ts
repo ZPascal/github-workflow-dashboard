@@ -67,12 +67,14 @@ describe('GitHubApiClient', () => {
         documentation_url: 'https://docs.github.com/rest'
       };
 
-      mockFetch.mockResolvedValueOnce({
+      const mockResponse = {
         ok: false,
         status: 401,
-        json: jest.fn().mockResolvedValueOnce(errorResponse),
+        json: jest.fn().mockResolvedValue(errorResponse),
         headers: new Headers()
-      } as any);
+      } as any;
+      mockFetch.mockResolvedValueOnce(mockResponse);
+      mockFetch.mockResolvedValueOnce({ ...mockResponse, json: jest.fn().mockResolvedValue(errorResponse) });
 
       await expect(client.validateToken()).rejects.toThrow(GitHubApiError);
       await expect(client.validateToken()).rejects.toThrow('Bad credentials');
@@ -107,7 +109,7 @@ describe('GitHubApiClient', () => {
       const result = await client.getRepositories('testuser', true);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/user/repos?',
+        'https://api.github.com/users/testuser/repos?',
         expect.any(Object)
       );
       
@@ -264,7 +266,7 @@ describe('GitHubApiClient', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/repos/testuser/test-repo/actions/runs?status=completed&branch=main&per_page=10&page=1',
+        'https://api.github.com/repos/testuser/test-repo/actions/runs?branch=main&status=completed&per_page=10&page=1',
         expect.any(Object)
       );
     });
@@ -306,6 +308,12 @@ describe('GitHubApiClient', () => {
     });
 
     it('should handle JSON parsing errors in error responses', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: jest.fn().mockRejectedValueOnce(new Error('Invalid JSON')),
+        headers: new Headers()
+      } as any);
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,

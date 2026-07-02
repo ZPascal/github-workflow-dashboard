@@ -13,7 +13,8 @@ import { useTheme } from '@/contexts/theme-context';
 import { useDisplaySettings, REFRESH_INTERVALS } from '@/contexts/display-settings-context';
 import { Badge } from '@/components/ui/badge';
 import { RepositorySelection } from '@/components/repository-selection';
-import { Moon, Sun, Monitor, Zap } from 'lucide-react';
+import { Moon, Sun, Monitor, Zap, Server } from 'lucide-react';
+import { GITHUB_DEFAULT_BASE_URL } from '@/lib/api/github';
 
 export default function SettingsPage() {
   const {
@@ -23,7 +24,9 @@ export default function SettingsPage() {
     error,
     setToken,
     removeToken,
-    isSecureStorageSupported
+    isSecureStorageSupported,
+    baseUrl,
+    setBaseUrl,
   } = useGitHubToken();
   
   const { theme, toggleTheme } = useTheme();
@@ -32,6 +35,7 @@ export default function SettingsPage() {
   const [tokenInput, setTokenInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dashboardNameInput, setDashboardNameInput] = useState(settings.dashboardName);
+  const [baseUrlInput, setBaseUrlInput] = useState(baseUrl);
 
   const handleTokenSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,7 +214,65 @@ export default function SettingsPage() {
             <RepositorySelection />
           )}
 
-          {/* Display Settings */}
+          {/* GitHub API URL Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Server className="w-5 h-5" />
+                GitHub API URL
+              </CardTitle>
+              <CardDescription>
+                Configure a custom API base URL for GitHub Enterprise Server instances.
+                Leave blank to use the default <code className="bg-muted px-1 rounded">api.github.com</code>.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {baseUrl !== GITHUB_DEFAULT_BASE_URL && (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
+                  <p className="text-blue-700 dark:text-blue-300 text-sm">
+                    Using custom GitHub API URL: <strong>{baseUrl}</strong>
+                  </p>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="github-base-url">API Base URL</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="github-base-url"
+                    type="url"
+                    placeholder={GITHUB_DEFAULT_BASE_URL}
+                    value={baseUrlInput}
+                    onChange={(e) => setBaseUrlInput(e.target.value)}
+                    className="flex-1 font-mono text-sm"
+                  />
+                  <Button
+                    onClick={() => setBaseUrl(baseUrlInput)}
+                    disabled={baseUrlInput.trim().replace(/\/$/, '') === baseUrl}
+                    size="sm"
+                  >
+                    Apply
+                  </Button>
+                  {baseUrl !== GITHUB_DEFAULT_BASE_URL && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setBaseUrlInput(GITHUB_DEFAULT_BASE_URL);
+                        setBaseUrl(GITHUB_DEFAULT_BASE_URL);
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  For GitHub Enterprise Server, enter the API endpoint, e.g.{' '}
+                  <code className="bg-muted px-1 rounded">https://github.example.com/api/v3</code>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

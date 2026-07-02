@@ -35,7 +35,7 @@ interface WorkflowProviderProps {
 }
 
 export function WorkflowProvider({ children }: WorkflowProviderProps) {
-  const { token, isValidated } = useGitHubToken();
+  const { token, isValidated, baseUrl } = useGitHubToken();
   const { selectedRepositories } = useRepositorySelection();
   const { settings } = useDisplaySettings();
   
@@ -84,7 +84,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     );
 
     try {
-      const apiClient = new GitHubApiClient(token);
+      const apiClient = new GitHubApiClient(token, baseUrl);
       const [owner, repo] = repositoryWorkflow.repository.full_name.split('/');
       
       console.log(`[Workflow Context] 🚀 Fetching current workflow statuses for ${owner}/${repo}...`);
@@ -123,7 +123,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
         )
       );
     }
-  }, [token, isValidated, repositoryWorkflows]);
+  }, [token, isValidated, baseUrl, repositoryWorkflows]);
 
   // Refresh all workflows
   const refreshWorkflows = useCallback(async () => {
@@ -135,8 +135,8 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     console.log(`[Workflow Context] 🔄 Refreshing workflows for ${repositoryWorkflows.length} repositories...`);
 
     try {
-      const apiClient = new GitHubApiClient(token);
-      
+      const apiClient = new GitHubApiClient(token, baseUrl);
+
       // Fetch workflows for all selected repositories in parallel
       const promises = repositoryWorkflows.map(async (rw) => {
         try {
@@ -189,7 +189,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [token, isValidated, repositoryWorkflows]);
+  }, [token, isValidated, baseUrl, repositoryWorkflows]);
 
   // Auto refresh workflows
   useEffect(() => {
