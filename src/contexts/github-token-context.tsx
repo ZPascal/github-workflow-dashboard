@@ -38,12 +38,7 @@ export function GitHubTokenProvider({ children }: GitHubTokenProviderProps) {
   const [userId, setUserId] = useState<string | null>(null);
   const [baseUrl, setBaseUrlState] = useState<string>(GITHUB_DEFAULT_BASE_URL);
 
-  // Check secure storage availability on mount
-  useEffect(() => {
-    setIsSecureStorageSupported(isSecureStorageAvailable());
-  }, []);
-
-  // Load baseUrl from storage on mount
+  // Load baseUrl from storage on mount, falling back to server-injected value
   useEffect(() => {
     async function loadStoredBaseUrl() {
       try {
@@ -58,56 +53,72 @@ export function GitHubTokenProvider({ children }: GitHubTokenProviderProps) {
     loadStoredBaseUrl();
   }, []);
 
-  // Load token from secure storage on mount
+  // Load token from secure storage on mount, falling back to VCAP_SERVICES via /api/config
   useEffect(() => {
     async function loadStoredToken() {
       console.log('[GitHub Token Context] Loading stored token...');
-      if (!isSecureStorageSupported) {
-        console.log('[GitHub Token Context] Secure storage not supported, skipping token load');
-        setIsLoading(false);
-        return;
-      }
 
-      try {
-        const storedToken = await getSecureItem(STORAGE_KEYS.GITHUB_TOKEN);
+      // Try localStorage first (works in browser; empty after CF container restart)
+      const secureAvailable = isSecureStorageAvailable();
+      setIsSecureStorageSupported(secureAvailable);
+
+      if (secureAvailable) {
+        const storedToken = await getSecureItem(STORAGE_KEYS.GITHUB_TOKEN).catch(() => null);
         console.log('[GitHub Token Context] Stored token found:', !!storedToken);
-        
+
         if (storedToken) {
           setTokenState(storedToken);
-          // Validate the stored token
           console.log('[GitHub Token Context] Validating stored token...');
           const validation = await validateGitHubToken(storedToken, baseUrl);
           console.log('[GitHub Token Context] Stored token validation result:', validation);
-          
+
           setIsValidated(validation.isValid);
           if (!validation.isValid) {
             console.warn('[GitHub Token Context] Stored token is no longer valid');
             setError('Stored token is no longer valid');
           } else {
-            console.log('[GitHub Token Context] Stored token is valid');
-            // load stored userId if available
-            try {
-              const storedUserId = await getSecureItem(STORAGE_KEYS.GITHUB_USER_ID);
-              if (storedUserId) {
-                setUserId(storedUserId as string);
+            const storedUserId = await getSecureItem(STORAGE_KEYS.GITHUB_USER_ID).catch(() => null);
+            if (storedUserId) setUserId(storedUserId);
+          }
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // No stored token — try server-injected credentials from VCAP_SERVICES
+      console.log('[GitHub Token Context] No stored token, trying /api/config...');
+      try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          const cfg = await res.json();
+          if (cfg.token) {
+            console.log('[GitHub Token Context] Using server-injected token from VCAP_SERVICES');
+            const resolvedUrl = (cfg.apiUrl || baseUrl).replace(/\/$/, '');
+            const validation = await validateGitHubToken(cfg.token, resolvedUrl);
+            if (validation.isValid) {
+              setTokenState(cfg.token);
+              setBaseUrlState(resolvedUrl);
+              setIsValidated(true);
+              // Persist so subsequent loads within the same container session skip /api/config
+              if (secureAvailable) {
+                await setSecureItem(STORAGE_KEYS.GITHUB_TOKEN, cfg.token).catch(() => null);
+                if (resolvedUrl !== GITHUB_DEFAULT_BASE_URL) {
+                  await setSecureItem(STORAGE_KEYS.GITHUB_BASE_URL, resolvedUrl).catch(() => null);
+                }
               }
-            } catch (err) {
-              console.warn('[GitHub Token Context] Failed to load stored userId', err);
             }
           }
-        } else {
-          console.log('[GitHub Token Context] No stored token found');
         }
-      } catch (err) {
-        console.error('[GitHub Token Context] Failed to load stored token:', err);
-        setError('Failed to load stored token');
-      } finally {
-        setIsLoading(false);
+      } catch {
+        // ignore — user must enter token manually
       }
+
+      setIsLoading(false);
     }
 
     loadStoredToken();
-  }, [isSecureStorageSupported, baseUrl]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setToken = async (newToken: string): Promise<void> => {
     console.log('[GitHub Token Context] Setting token...');
