@@ -87,6 +87,6 @@ To stop and remove containers:
 docker-compose down
 ```
 
-### 4. Deploy with Vercel
+## Acknowledgements
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%cheney-yan-ifl%2Fgithub-workflow-dashboard)
+Based on the original work by [cheney-yan](https://github.com/cheney-yan/github-workflow-dashboard).
