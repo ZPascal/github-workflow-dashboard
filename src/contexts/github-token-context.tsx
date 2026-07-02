@@ -96,16 +96,20 @@ export function GitHubTokenProvider({ children }: GitHubTokenProviderProps) {
             const resolvedUrl = (cfg.apiUrl || baseUrl).replace(/\/$/, '');
             const validation = await validateGitHubToken(cfg.token, resolvedUrl);
             if (validation.isValid) {
+              // Persist before setting state — re-check availability here in case
+              // isSecureStorageAvailable() returned false during SSR hydration
+              try {
+                await setSecureItem(STORAGE_KEYS.GITHUB_TOKEN, cfg.token);
+                if (resolvedUrl !== GITHUB_DEFAULT_BASE_URL) {
+                  await setSecureItem(STORAGE_KEYS.GITHUB_BASE_URL, resolvedUrl);
+                }
+                setIsSecureStorageSupported(true);
+              } catch {
+                // storage unavailable — token lives in state only for this session
+              }
               setTokenState(cfg.token);
               setBaseUrlState(resolvedUrl);
               setIsValidated(true);
-              // Persist so subsequent loads within the same container session skip /api/config
-              if (secureAvailable) {
-                await setSecureItem(STORAGE_KEYS.GITHUB_TOKEN, cfg.token).catch(() => null);
-                if (resolvedUrl !== GITHUB_DEFAULT_BASE_URL) {
-                  await setSecureItem(STORAGE_KEYS.GITHUB_BASE_URL, resolvedUrl).catch(() => null);
-                }
-              }
             }
           }
         }
