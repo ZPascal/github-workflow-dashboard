@@ -107,7 +107,7 @@ export function GitHubTokenProvider({ children }: GitHubTokenProviderProps) {
     }
 
     loadStoredToken();
-  }, [isSecureStorageSupported]);
+  }, [isSecureStorageSupported, baseUrl]);
 
   const setToken = async (newToken: string): Promise<void> => {
     console.log('[GitHub Token Context] Setting token...');

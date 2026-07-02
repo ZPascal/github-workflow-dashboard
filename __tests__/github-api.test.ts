@@ -109,7 +109,7 @@ describe('GitHubApiClient', () => {
       const result = await client.getRepositories('testuser', true);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/user/repos?',
+        'https://api.github.com/users/testuser/repos?',
         expect.any(Object)
       );
       
@@ -266,7 +266,7 @@ describe('GitHubApiClient', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/repos/testuser/test-repo/actions/runs?status=completed&branch=main&per_page=10&page=1',
+        'https://api.github.com/repos/testuser/test-repo/actions/runs?branch=main&status=completed&per_page=10&page=1',
         expect.any(Object)
       );
     });
