@@ -11,6 +11,8 @@ const mockToggleTheme = jest.fn();
 const mockToggleCompactMode = jest.fn();
 const mockSetRefreshInterval = jest.fn();
 const mockSetDashboardName = jest.fn();
+const mockSetWorkflowNameFilter = jest.fn();
+const mockTogglePinnedWorkflow = jest.fn();
 const mockUpdateSettings = jest.fn();
 
 const defaultTokenContext = {
@@ -40,12 +42,14 @@ jest.mock('@/contexts/theme-context', () => ({
 
 jest.mock('@/contexts/display-settings-context', () => ({
   useDisplaySettings: () => ({
-    settings: { compactMode: false, refreshInterval: 120, dashboardName: 'GitHub Workflow Dashboard' },
+    settings: { compactMode: false, refreshInterval: 120, dashboardName: 'GitHub Workflow Dashboard', workflowNameFilter: '', pinnedWorkflows: [] },
     updateSettings: mockUpdateSettings,
     toggleCompactMode: mockToggleCompactMode,
     setRefreshInterval: mockSetRefreshInterval,
     getRefreshIntervalLabel: (v: number) => `${v}s`,
     setDashboardName: mockSetDashboardName,
+    setWorkflowNameFilter: mockSetWorkflowNameFilter,
+    togglePinnedWorkflow: mockTogglePinnedWorkflow,
   }),
   REFRESH_INTERVALS: [
     { value: 30, label: '30 seconds' },

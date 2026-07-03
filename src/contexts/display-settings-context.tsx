@@ -19,6 +19,8 @@ interface DisplaySettings {
   compactMode: boolean;
   refreshInterval: RefreshInterval;
   dashboardName: string;
+  workflowNameFilter: string;
+  pinnedWorkflows: string[];
 }
 
 interface DisplaySettingsContextType {
@@ -28,6 +30,8 @@ interface DisplaySettingsContextType {
   setRefreshInterval: (interval: RefreshInterval) => void;
   getRefreshIntervalLabel: (interval: RefreshInterval) => string;
   setDashboardName: (name: string) => void;
+  setWorkflowNameFilter: (filter: string) => void;
+  togglePinnedWorkflow: (name: string) => void;
 }
 
 const DisplaySettingsContext = createContext<DisplaySettingsContextType | undefined>(undefined);
@@ -46,8 +50,10 @@ interface DisplaySettingsProviderProps {
 
 const DEFAULT_SETTINGS: DisplaySettings = {
   compactMode: false,
-  refreshInterval: 120, // Default 2 minutes (keeping existing behavior)
-  dashboardName: 'GitHub Workflow Dashboard'
+  refreshInterval: 120,
+  dashboardName: 'GitHub Workflow Dashboard',
+  workflowNameFilter: '',
+  pinnedWorkflows: [],
 };
 
 export function DisplaySettingsProvider({ children }: DisplaySettingsProviderProps) {
@@ -90,20 +96,34 @@ export function DisplaySettingsProvider({ children }: DisplaySettingsProviderPro
     updateSettings({ dashboardName: name });
   };
 
+  const setWorkflowNameFilter = (filter: string) => {
+    updateSettings({ workflowNameFilter: filter });
+  };
+
+  const togglePinnedWorkflow = (name: string) => {
+    const pinned = settings.pinnedWorkflows;
+    const next = pinned.includes(name)
+      ? pinned.filter(n => n !== name)
+      : [...pinned, name];
+    updateSettings({ pinnedWorkflows: next });
+  };
+
   const getRefreshIntervalLabel = (interval: RefreshInterval): string => {
     const found = REFRESH_INTERVALS.find(item => item.value === interval);
     return found?.label || `${interval} seconds`;
   };
 
   return (
-    <DisplaySettingsContext.Provider 
-      value={{ 
-        settings, 
-        updateSettings, 
-        toggleCompactMode, 
-        setRefreshInterval, 
+    <DisplaySettingsContext.Provider
+      value={{
+        settings,
+        updateSettings,
+        toggleCompactMode,
+        setRefreshInterval,
         getRefreshIntervalLabel,
-        setDashboardName
+        setDashboardName,
+        setWorkflowNameFilter,
+        togglePinnedWorkflow
       }}
     >
       {children}
