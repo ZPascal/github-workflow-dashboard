@@ -549,6 +549,7 @@ export function WorkflowDashboard() {
         />
         {settings.workflowNameFilter && (
           <button
+            type="button"
             onClick={() => setWorkflowNameFilter('')}
             className="absolute right-2 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Clear filter"
