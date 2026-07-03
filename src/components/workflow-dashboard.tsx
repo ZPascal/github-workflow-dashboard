@@ -372,6 +372,17 @@ export function WorkflowDashboard() {
     }
   };
 
+  // Function to sort workflows with pinned items first
+  const sortWithPins = (workflows: GitHubWorkflowRun[]): GitHubWorkflowRun[] => {
+    const pinned = settings.pinnedWorkflows;
+    if (pinned.length === 0) return workflows;
+    const pinnedItems = workflows
+      .filter(w => pinned.includes(w.name))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const unpinned = workflows.filter(w => !pinned.includes(w.name));
+    return [...pinnedItems, ...unpinned];
+  };
+
   // Function to filter workflows based on active filter and onlyMe
   const filterWorkflows = (workflows: GitHubWorkflowRun[]) => {
     let filteredWorkflows = workflows;
@@ -636,8 +647,8 @@ export function WorkflowDashboard() {
                 }
                 return filterWorkflows(repositoryWorkflow.workflows).length > 0;
               })
-              .flatMap(repositoryWorkflow => 
-                filterWorkflows(repositoryWorkflow.workflows).map(workflow => ({
+              .flatMap(repositoryWorkflow =>
+                sortWithPins(filterWorkflows(repositoryWorkflow.workflows)).map(workflow => ({
                   ...workflow,
                   repositoryName: `${repositoryWorkflow.repository.owner.login}/${repositoryWorkflow.repository.name}`,
                   repositoryOwner: repositoryWorkflow.repository.owner.login,
@@ -681,16 +692,29 @@ export function WorkflowDashboard() {
                       </a>
                     </div>
                     
-                    {/* Workflow title */}
-                    <div className="flex items-start">
+                    {/* Workflow title + pin */}
+                    <div className="flex items-start justify-between gap-1">
                       <a
                         href={workflow.html_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-medium text-sm text-foreground hover:text-primary transition-colors flex-1 min-w-0 group"
+                        className="text-sm font-medium hover:text-primary transition-colors text-foreground flex items-center gap-1 group flex-1 min-w-0 truncate"
                       >
-                        <span className="line-clamp-2">{workflow.name}</span>
+                        <span className="truncate">{workflow.name}</span>
+                        <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-60 group-hover:opacity-100" />
                       </a>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); togglePinnedWorkflow(workflow.name); }}
+                        className={`flex-shrink-0 p-0.5 rounded transition-colors ${
+                          settings.pinnedWorkflows.includes(workflow.name)
+                            ? 'text-amber-500 hover:text-amber-600'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                        title={settings.pinnedWorkflows.includes(workflow.name) ? 'Unpin workflow' : 'Pin to top'}
+                      >
+                        <Pin className="w-3 h-3" />
+                      </button>
                     </div>
                     
                     {/* Workflow metadata */}
@@ -784,7 +808,7 @@ export function WorkflowDashboard() {
                 </div>
               ) : (
                 <div className={`space-y-${settings.compactMode ? '3' : '4'}`}>
-                  {filterWorkflows(repositoryWorkflow.workflows).map((workflow) => {
+                  {sortWithPins(filterWorkflows(repositoryWorkflow.workflows)).map((workflow) => {
                     // Determine strong colored border based on status
                     let borderColor = 'border-l-4 border-l-slate-300 dark:border-l-slate-600';
                     if (workflow.status === 'completed') {
@@ -806,7 +830,7 @@ export function WorkflowDashboard() {
                     return (
                     <div
                       key={workflow.id}
-                      className={`flex flex-col ${settings.compactMode ? 'p-3' : 'p-4'} border rounded-xl hover:shadow-md hover:border-primary/30 transition-all duration-200 gap-${settings.compactMode ? '2' : '3'} ${borderColor}`}
+                      className={`group flex flex-col ${settings.compactMode ? 'p-3' : 'p-4'} border rounded-xl hover:shadow-md hover:border-primary/30 transition-all duration-200 gap-${settings.compactMode ? '2' : '3'} ${borderColor}`}
                     >
                       <div className="flex-1 min-w-0">
                         {/* Header with title and status */}
@@ -822,10 +846,22 @@ export function WorkflowDashboard() {
                               <ExternalLink className={`${settings.compactMode ? 'w-3 h-3' : 'w-4 h-4'} flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity`} />
                             </a>
                           </div>
-                          <div className="flex-shrink-0">
-                            <WorkflowStatusBadge 
-                              status={workflow.status} 
-                              conclusion={workflow.conclusion} 
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); togglePinnedWorkflow(workflow.name); }}
+                              className={`p-1 rounded transition-colors ${
+                                settings.pinnedWorkflows.includes(workflow.name)
+                                  ? 'text-amber-500 hover:text-amber-600'
+                                  : 'text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground'
+                              }`}
+                              title={settings.pinnedWorkflows.includes(workflow.name) ? 'Unpin workflow' : 'Pin to top'}
+                            >
+                              <Pin className="w-3.5 h-3.5" />
+                            </button>
+                            <WorkflowStatusBadge
+                              status={workflow.status}
+                              conclusion={workflow.conclusion}
                             />
                           </div>
                         </div>
