@@ -120,6 +120,11 @@ export function WorkflowDashboard() {
   const [onlyMe, setOnlyMe] = React.useState(false);
   const [showPinnedOnly, setShowPinnedOnly] = React.useState(false);
 
+  // Reset showPinnedOnly when all pins are cleared
+  React.useEffect(() => {
+    if (settings.pinnedWorkflows.length === 0) setShowPinnedOnly(false);
+  }, [settings.pinnedWorkflows.length]);
+
   // Get total repository count (before filtering)
   const totalRepoCount = repositoryWorkflows.length;
 

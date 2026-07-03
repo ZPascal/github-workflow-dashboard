@@ -72,13 +72,13 @@ export function DisplaySettingsProvider({ children }: DisplaySettingsProviderPro
     }
   }, []);
 
-  // Save settings to localStorage when they change
+  // Save settings to localStorage when they change (workflowNameFilter is session-only)
   const updateSettings = (updates: Partial<DisplaySettings>) => {
     const newSettings = { ...settings, ...updates };
     setSettings(newSettings);
-    
     try {
-      localStorage.setItem('github-flow-dashboard-settings', JSON.stringify(newSettings));
+      const { workflowNameFilter: _, ...persistent } = newSettings;
+      localStorage.setItem('github-flow-dashboard-settings', JSON.stringify(persistent));
     } catch (error) {
       console.warn('Failed to save display settings to localStorage:', error);
     }
