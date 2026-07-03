@@ -372,13 +372,12 @@ export function WorkflowDashboard() {
     }
   };
 
-  // When any workflows are pinned, show only those; otherwise show all.
   const sortWithPins = (workflows: GitHubWorkflowRun[]): GitHubWorkflowRun[] => {
     const pinned = settings.pinnedWorkflows;
     if (pinned.length === 0) return workflows;
-    return workflows
-      .filter(w => pinned.includes(w.name))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const pinnedItems = workflows.filter(w => pinned.includes(w.name));
+    const unpinned = workflows.filter(w => !pinned.includes(w.name));
+    return [...pinnedItems, ...unpinned];
   };
 
   // Function to filter workflows based on active filter and onlyMe
@@ -677,7 +676,7 @@ export function WorkflowDashboard() {
                 return (
                   <div
                     key={`${workflow.repositoryName}-${workflow.id}`}
-                    className={`flex flex-col p-2 border rounded-lg hover:shadow-md hover:border-primary/30 transition-all duration-200 gap-2 ${borderColor} h-fit`}
+                    className={`flex flex-col p-2 border rounded-lg hover:shadow-md hover:border-primary/30 transition-all duration-200 gap-2 ${borderColor} h-fit ${settings.pinnedWorkflows.length > 0 && !isPinned ? 'opacity-30' : ''}`}
                   >
                     {/* Repository name link */}
                     <div className="flex items-center gap-1 mb-1">
@@ -832,7 +831,7 @@ export function WorkflowDashboard() {
                     return (
                     <div
                       key={workflow.id}
-                      className={`group flex flex-col ${settings.compactMode ? 'p-3' : 'p-4'} border rounded-xl hover:shadow-md hover:border-primary/30 transition-all duration-200 gap-${settings.compactMode ? '2' : '3'} ${borderColor}`}
+                      className={`group flex flex-col ${settings.compactMode ? 'p-3' : 'p-4'} border rounded-xl hover:shadow-md hover:border-primary/30 transition-all duration-200 gap-${settings.compactMode ? '2' : '3'} ${borderColor} ${settings.pinnedWorkflows.length > 0 && !isPinned ? 'opacity-30' : ''}`}
                     >
                       <div className="flex-1 min-w-0">
                         {/* Header with title and status */}
