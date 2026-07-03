@@ -656,6 +656,7 @@ export function WorkflowDashboard() {
                 }))
               )
               .map((workflow) => {
+                const isPinned = settings.pinnedWorkflows.includes(workflow.name);
                 // Determine strong colored border based on status
                 let borderColor = 'border-l-4 border-l-slate-300 dark:border-l-slate-600';
                 if (workflow.status === 'completed') {
@@ -673,7 +674,7 @@ export function WorkflowDashboard() {
                 } else if (workflow.status === 'queued') {
                   borderColor = 'border-l-4 border-l-orange-500 dark:border-l-orange-400';
                 }
-                
+
                 return (
                   <div
                     key={`${workflow.repositoryName}-${workflow.id}`}
@@ -691,7 +692,7 @@ export function WorkflowDashboard() {
                         <ExternalLink className="w-2.5 h-2.5 flex-shrink-0 opacity-60 group-hover:opacity-100" />
                       </a>
                     </div>
-                    
+
                     {/* Workflow title + pin */}
                     <div className="flex items-start justify-between gap-1">
                       <a
@@ -707,11 +708,12 @@ export function WorkflowDashboard() {
                         type="button"
                         onClick={(e) => { e.stopPropagation(); togglePinnedWorkflow(workflow.name); }}
                         className={`flex-shrink-0 p-0.5 rounded transition-colors ${
-                          settings.pinnedWorkflows.includes(workflow.name)
+                          isPinned
                             ? 'text-amber-500 hover:text-amber-600'
                             : 'text-muted-foreground hover:text-foreground'
                         }`}
-                        title={settings.pinnedWorkflows.includes(workflow.name) ? 'Unpin workflow' : 'Pin to top'}
+                        title={isPinned ? 'Unpin workflow' : 'Pin to top'}
+                        aria-label={isPinned ? 'Unpin workflow' : 'Pin to top'}
                       >
                         <Pin className="w-3 h-3" />
                       </button>
@@ -809,6 +811,7 @@ export function WorkflowDashboard() {
               ) : (
                 <div className={`space-y-${settings.compactMode ? '3' : '4'}`}>
                   {sortWithPins(filterWorkflows(repositoryWorkflow.workflows)).map((workflow) => {
+                    const isPinned = settings.pinnedWorkflows.includes(workflow.name);
                     // Determine strong colored border based on status
                     let borderColor = 'border-l-4 border-l-slate-300 dark:border-l-slate-600';
                     if (workflow.status === 'completed') {
@@ -851,11 +854,12 @@ export function WorkflowDashboard() {
                               type="button"
                               onClick={(e) => { e.stopPropagation(); togglePinnedWorkflow(workflow.name); }}
                               className={`p-1 rounded transition-colors ${
-                                settings.pinnedWorkflows.includes(workflow.name)
+                                isPinned
                                   ? 'text-amber-500 hover:text-amber-600'
-                                  : 'text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground'
+                                  : 'text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground'
                               }`}
-                              title={settings.pinnedWorkflows.includes(workflow.name) ? 'Unpin workflow' : 'Pin to top'}
+                              title={isPinned ? 'Unpin workflow' : 'Pin to top'}
+                              aria-label={isPinned ? 'Unpin workflow' : 'Pin to top'}
                             >
                               <Pin className="w-3.5 h-3.5" />
                             </button>
