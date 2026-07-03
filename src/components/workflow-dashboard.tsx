@@ -118,6 +118,7 @@ export function WorkflowDashboard() {
   // Filter state management
   const [activeFilter, setActiveFilter] = React.useState<string | null>(null);
   const [onlyMe, setOnlyMe] = React.useState(false);
+  const [showPinnedOnly, setShowPinnedOnly] = React.useState(false);
 
   // Get total repository count (before filtering)
   const totalRepoCount = repositoryWorkflows.length;
@@ -397,7 +398,7 @@ export function WorkflowDashboard() {
       filteredWorkflows = filteredWorkflows.filter(w =>
         w.name.toLowerCase().includes(lower)
       );
-    } else if (settings.pinnedWorkflows.length > 0) {
+    } else if (showPinnedOnly && settings.pinnedWorkflows.length > 0) {
       filteredWorkflows = filteredWorkflows.filter(w =>
         settings.pinnedWorkflows.includes(w.name)
       );
@@ -559,6 +560,25 @@ export function WorkflowDashboard() {
           </button>
         )}
       </div>
+
+      {/* Show pinned only toggle */}
+      {settings.pinnedWorkflows.length > 0 && (
+        <div className="flex items-center mt-2">
+          <button
+            type="button"
+            onClick={() => setShowPinnedOnly(v => !v)}
+            className={`flex items-center gap-1.5 h-8 px-3 text-sm rounded-md border transition-colors ${
+              showPinnedOnly
+                ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
+                : 'border-input text-muted-foreground hover:text-foreground hover:border-foreground'
+            }`}
+            aria-label={showPinnedOnly ? 'Show all workflows' : 'Show pinned only'}
+          >
+            <Pin className="w-3.5 h-3.5" />
+            <span>{showPinnedOnly ? `Pinned (${settings.pinnedWorkflows.length})` : `Show pinned only (${settings.pinnedWorkflows.length})`}</span>
+          </button>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className={`grid gap-2 ${
