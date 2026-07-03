@@ -12,7 +12,7 @@ import { useGitHubToken } from '@/contexts/github-token-context';
 import { useDisplaySettings, REFRESH_INTERVALS } from '@/contexts/display-settings-context';
 import { useTheme } from '@/contexts/theme-context';
 import { GitHubWorkflowRun } from '@/lib/api/types';
-import { RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, Loader, ExternalLink, Moon, Sun, Monitor, Settings, ZoomIn, ZoomOut } from 'lucide-react';
+import { RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, Loader, ExternalLink, Moon, Sun, Monitor, Settings, ZoomIn, ZoomOut, Pin, X } from 'lucide-react';
 
 interface WorkflowStatusBadgeProps {
   status: GitHubWorkflowRun['status'];
@@ -104,7 +104,7 @@ function formatTimeAgo(dateString: string): string {
 export function WorkflowDashboard() {
   const { token, isValidated, userId } = useGitHubToken();
   const { selectedRepositories } = useRepositorySelection();
-  const { settings, toggleCompactMode, setRefreshInterval } = useDisplaySettings();
+  const { settings, toggleCompactMode, setRefreshInterval, setWorkflowNameFilter, togglePinnedWorkflow } = useDisplaySettings();
   const { theme, setTheme } = useTheme();
   const { 
     repositoryWorkflows, 
@@ -375,8 +375,7 @@ export function WorkflowDashboard() {
   // Function to filter workflows based on active filter and onlyMe
   const filterWorkflows = (workflows: GitHubWorkflowRun[]) => {
     let filteredWorkflows = workflows;
-    
-    // First apply the "Only Me" filter if enabled
+
     if (onlyMe && userId) {
       filteredWorkflows = filteredWorkflows.filter(workflow => {
         const actor = workflow.actor?.login || '';
@@ -384,23 +383,21 @@ export function WorkflowDashboard() {
         return actor === userId || commitAuthor === userId;
       });
     }
-    
-    // Then apply the status/conclusion filter if active
-    if (!activeFilter || activeFilter === 'Total') {
-      return filteredWorkflows; // Show all workflows (after onlyMe filter)
+
+    if (settings.workflowNameFilter) {
+      const lower = settings.workflowNameFilter.toLowerCase();
+      filteredWorkflows = filteredWorkflows.filter(w =>
+        w.name.toLowerCase().includes(lower)
+      );
     }
-    
+
+    if (!activeFilter || activeFilter === 'Total') {
+      return filteredWorkflows;
+    }
+
     return filteredWorkflows.filter(workflow => {
-      // Filter by status (for non-completed workflows)
-      if (workflow.status === activeFilter) {
-        return true;
-      }
-      
-      // Filter by conclusion (for completed workflows)
-      if (workflow.status === 'completed' && workflow.conclusion === activeFilter) {
-        return true;
-      }
-      
+      if (workflow.status === activeFilter) return true;
+      if (workflow.status === 'completed' && workflow.conclusion === activeFilter) return true;
       return false;
     });
   };
@@ -528,6 +525,26 @@ export function WorkflowDashboard() {
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Workflow name filter */}
+      <div className="relative flex items-center mt-2">
+        <input
+          type="text"
+          value={settings.workflowNameFilter}
+          onChange={(e) => setWorkflowNameFilter(e.target.value)}
+          placeholder="Filter by workflow name..."
+          className="w-full h-8 px-3 pr-8 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        {settings.workflowNameFilter && (
+          <button
+            onClick={() => setWorkflowNameFilter('')}
+            className="absolute right-2 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Clear filter"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Summary cards */}
