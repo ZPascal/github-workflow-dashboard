@@ -372,15 +372,13 @@ export function WorkflowDashboard() {
     }
   };
 
-  // Function to sort workflows with pinned items first
+  // When any workflows are pinned, show only those; otherwise show all.
   const sortWithPins = (workflows: GitHubWorkflowRun[]): GitHubWorkflowRun[] => {
     const pinned = settings.pinnedWorkflows;
     if (pinned.length === 0) return workflows;
-    const pinnedItems = workflows
+    return workflows
       .filter(w => pinned.includes(w.name))
       .sort((a, b) => a.name.localeCompare(b.name));
-    const unpinned = workflows.filter(w => !pinned.includes(w.name));
-    return [...pinnedItems, ...unpinned];
   };
 
   // Function to filter workflows based on active filter and onlyMe
