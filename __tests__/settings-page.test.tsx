@@ -1,12 +1,11 @@
 // __tests__/settings-page.test.tsx
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { GITHUB_DEFAULT_BASE_URL } from '@/lib/api/github';
 
 // --- context mocks ---
 const mockSetToken = jest.fn();
 const mockRemoveToken = jest.fn();
-const mockSetBaseUrl = jest.fn();
 const mockToggleTheme = jest.fn();
 const mockToggleCompactMode = jest.fn();
 const mockSetRefreshInterval = jest.fn();
@@ -14,17 +13,13 @@ const mockSetDashboardName = jest.fn();
 const mockUpdateSettings = jest.fn();
 
 const defaultTokenContext = {
-  token: null,
   isValidated: false,
   isLoading: false,
   error: null,
   userId: null,
   baseUrl: GITHUB_DEFAULT_BASE_URL,
-  isSecureStorageSupported: true,
   setToken: mockSetToken,
   removeToken: mockRemoveToken,
-  validateToken: jest.fn(),
-  setBaseUrl: mockSetBaseUrl,
 };
 
 // Use a mutable ref so individual tests can override the context value
@@ -105,26 +100,16 @@ describe('SettingsPage', () => {
     expect(input.value).toBe(GITHUB_DEFAULT_BASE_URL);
   });
 
-  it('Apply button calls setBaseUrl with the entered URL', () => {
-    render(<SettingsPage />);
-    const input = screen.getByLabelText(/API Base URL/i);
-    fireEvent.change(input, { target: { value: 'https://ghe.example.com/api/v3' } });
-    fireEvent.click(screen.getByRole('button', { name: /Apply/i }));
-    expect(mockSetBaseUrl).toHaveBeenCalledWith('https://ghe.example.com/api/v3');
-  });
-
   it('Reset button is not shown when using the default URL', () => {
     render(<SettingsPage />);
     expect(screen.queryByRole('button', { name: /Reset/i })).not.toBeInTheDocument();
   });
 
-  it('Reset button is shown when baseUrl differs from default and resets to default', () => {
+  it('Reset button is shown when baseUrl differs from default', () => {
     // Override the context to simulate a custom baseUrl being set
     currentTokenContext = { ...defaultTokenContext, baseUrl: 'https://ghe.example.com/api/v3' };
     render(<SettingsPage />);
     const resetBtn = screen.getByRole('button', { name: /Reset/i });
     expect(resetBtn).toBeInTheDocument();
-    fireEvent.click(resetBtn);
-    expect(mockSetBaseUrl).toHaveBeenCalledWith(GITHUB_DEFAULT_BASE_URL);
   });
 });

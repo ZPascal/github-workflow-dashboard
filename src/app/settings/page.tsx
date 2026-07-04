@@ -18,20 +18,17 @@ import { GITHUB_DEFAULT_BASE_URL } from '@/lib/api/github';
 
 export default function SettingsPage() {
   const {
-    token,
     isValidated,
     isLoading,
     error,
+    baseUrl,
     setToken,
     removeToken,
-    isSecureStorageSupported,
-    baseUrl,
-    setBaseUrl,
   } = useGitHubToken();
-  
+
   const { theme, toggleTheme } = useTheme();
   const { settings, toggleCompactMode, setRefreshInterval, getRefreshIntervalLabel, setDashboardName } = useDisplaySettings();
-  
+
   const [tokenInput, setTokenInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dashboardNameInput, setDashboardNameInput] = useState(settings.dashboardName);
@@ -39,12 +36,12 @@ export default function SettingsPage() {
 
   const handleTokenSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!tokenInput.trim()) return;
-    
+
     setIsSubmitting(true);
     try {
-      await setToken(tokenInput.trim());
+      await setToken(tokenInput.trim(), baseUrlInput.trim() || undefined);
       setTokenInput(''); // Clear input on success
     } catch (err) {
       // Error is handled by the context
@@ -83,19 +80,9 @@ export default function SettingsPage() {
               <CardTitle className="flex items-center justify-between">
                 GitHub Token
                 <div className="flex items-center gap-2">
-                  {!isSecureStorageSupported && (
-                    <Badge variant="destructive" className="text-xs">
-                      Secure storage not supported
-                    </Badge>
-                  )}
-                  {token && isValidated && (
+                  {isValidated && (
                     <Badge variant="default" className="text-xs">
                       Valid Token
-                    </Badge>
-                  )}
-                  {token && !isValidated && !isLoading && (
-                    <Badge variant="destructive" className="text-xs">
-                      Invalid Token
                     </Badge>
                   )}
                   {isLoading && (
@@ -125,36 +112,21 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {!isSecureStorageSupported && (
-                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-md p-3 mb-4">
-                  <p className="text-yellow-700 dark:text-yellow-300 text-sm">
-                    ⚠️ Secure storage is not available in your browser. 
-                    Tokens will only persist for this session.
-                  </p>
-                </div>
-              )}
-
-              {token ? (
+              {isValidated ? (
                 <div className="space-y-4">
-                  <div>
-                    <Label>Current Token</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Input 
-                        type="password" 
-                        value={token.slice(0, 8) + '••••••••'} 
-                        readOnly 
-                        className="flex-1"
-                      />
-                      <Button
-                        variant="destructive"
-                        onClick={handleRemoveToken}
-                        disabled={isLoading}
-                      >
-                        Remove
-                      </Button>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground flex-1">
+                      Token is configured and validated. Use the form below to update it.
+                    </p>
+                    <Button
+                      variant="destructive"
+                      onClick={handleRemoveToken}
+                      disabled={isLoading}
+                    >
+                      Remove
+                    </Button>
                   </div>
-                  
+
                   <div className="pt-4 border-t">
                     <Label>Update Token</Label>
                     <form onSubmit={handleTokenSubmit} className="mt-2">
@@ -167,8 +139,8 @@ export default function SettingsPage() {
                           disabled={isSubmitting}
                           className="flex-1"
                         />
-                        <Button 
-                          type="submit" 
+                        <Button
+                          type="submit"
                           disabled={isSubmitting || !tokenInput.trim()}
                         >
                           {isSubmitting ? 'Updating...' : 'Update'}
@@ -195,9 +167,9 @@ export default function SettingsPage() {
                         Required scopes: <code className="bg-muted px-1 rounded">repo</code>, <code className="bg-muted px-1 rounded">actions:read</code>
                       </p>
                     </div>
-                    
-                    <Button 
-                      type="submit" 
+
+                    <Button
+                      type="submit"
                       className="w-full"
                       disabled={isSubmitting || !tokenInput.trim()}
                     >
@@ -210,7 +182,7 @@ export default function SettingsPage() {
           </Card>
 
           {/* Repository Selection - Only show when token is validated */}
-          {token && isValidated && (
+          {isValidated && (
             <RepositorySelection />
           )}
 
@@ -224,6 +196,7 @@ export default function SettingsPage() {
               <CardDescription>
                 Configure a custom API base URL for GitHub Enterprise Server instances.
                 Leave blank to use the default <code className="bg-muted px-1 rounded">api.github.com</code>.
+                Changes take effect on next login.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -246,8 +219,8 @@ export default function SettingsPage() {
                     className="flex-1 font-mono text-sm"
                   />
                   <Button
-                    onClick={() => setBaseUrl(baseUrlInput)}
-                    disabled={baseUrlInput.trim().replace(/\/$/, '') === baseUrl}
+                    onClick={() => setToken(tokenInput, baseUrlInput)}
+                    disabled={baseUrlInput.trim().replace(/\/$/, '') === baseUrl || !tokenInput.trim()}
                     size="sm"
                   >
                     Apply
@@ -258,7 +231,7 @@ export default function SettingsPage() {
                       size="sm"
                       onClick={() => {
                         setBaseUrlInput(GITHUB_DEFAULT_BASE_URL);
-                        setBaseUrl(GITHUB_DEFAULT_BASE_URL);
+                        setToken(tokenInput, GITHUB_DEFAULT_BASE_URL);
                       }}
                     >
                       Reset
@@ -412,10 +385,10 @@ export default function SettingsPage() {
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-3">💡 How to Create Your Token</h4>
-                  
+                  <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-3">How to Create Your Token</h4>
+
                   <div className="space-y-3">
                     <div>
                       <h5 className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-1">Option 1: Fine-grained Token (Recommended)</h5>
@@ -431,7 +404,7 @@ export default function SettingsPage() {
                         <li>6. Generate and copy your token immediately</li>
                       </ol>
                     </div>
-                    
+
                     <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
                       <h5 className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-1">Option 2: Classic Token (Also Works)</h5>
                       <ol className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
@@ -447,20 +420,19 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-                  <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-2">🔒 Security Best Practices</h4>
+                  <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-2">Security Best Practices</h4>
                   <ul className="text-xs text-amber-800 dark:text-amber-200 space-y-1">
                     <li>• Use <strong>fine-grained tokens</strong> instead of classic tokens for better security</li>
                     <li>• Limit access to only the repositories you need to monitor</li>
                     <li>• Set reasonable expiration dates and rotate tokens regularly</li>
                     <li>• Never share your token or commit it to version control</li>
-                    <li>• Store tokens securely using your browser&apos;s credential manager when available</li>
                   </ul>
                 </div>
-                
+
                 <div className="p-4 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg">
-                  <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-2">⚠️ Organization & Cross-Repo Access</h4>
+                  <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-2">Organization &amp; Cross-Repo Access</h4>
                   <div className="text-xs text-orange-800 dark:text-orange-200 space-y-2">
                     <p><strong>For scanning ALL organizations and repositories, you may need additional permissions:</strong></p>
                     <ul className="space-y-1 mt-2">

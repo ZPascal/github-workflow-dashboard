@@ -102,7 +102,7 @@ function formatTimeAgo(dateString: string): string {
 }
 
 export function WorkflowDashboard() {
-  const { token, isValidated, userId } = useGitHubToken();
+  const { isValidated, userId } = useGitHubToken();
   const { selectedRepositories } = useRepositorySelection();
   const { settings, toggleCompactMode, setRefreshInterval } = useDisplaySettings();
   const { theme, setTheme } = useTheme();
@@ -149,7 +149,7 @@ export function WorkflowDashboard() {
   }, [refreshWorkflows, toggleCompactMode]);
 
   // Show setup message if no token
-  if (!token || !isValidated) {
+  if (!isValidated) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="w-full max-w-md">

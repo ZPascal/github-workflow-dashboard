@@ -5,7 +5,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import { setSecureItem, getSecureItem, STORAGE_KEYS } from '@/lib/storage/secure-storage';
 import { GitHubApiClient } from '@/lib/api/github';
 import { Repository } from '@/lib/api/types';
 import { useGitHubToken } from './github-token-context';
@@ -54,7 +53,7 @@ interface RepositorySelectionProviderProps {
 }
 
 export function RepositorySelectionProvider({ children }: RepositorySelectionProviderProps) {
-  const { token, isValidated, userId, baseUrl } = useGitHubToken();
+  const { isValidated, userId, baseUrl } = useGitHubToken();
   const [selectedRepositories, setSelectedRepositoriesState] = useState<RepositoryWithWorkflowStatus[]>([]);
   const [availableRepositories, setAvailableRepositories] = useState<RepositoryWithWorkflowStatus[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -65,52 +64,39 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
   const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
   const [nameFilter, setNameFilterState] = useState<string>('');
 
-  // Load selected repositories and last organization from storage on mount
+  // Load selected repositories and last organization from server settings on mount
   useEffect(() => {
-    async function loadStoredData() {
+    async function loadFromServer() {
       try {
-        // Load selected repositories
-        const stored = await getSecureItem(STORAGE_KEYS.SELECTED_REPOSITORIES);
-        if (stored) {
-          const repositories = JSON.parse(stored) as Repository[];
-          // Convert Repository[] to RepositoryWithWorkflowStatus[] for selected repos
-          const repositoriesWithStatus = repositories.map(repo => ({
-            ...repo,
-            workflowStatus: 'unknown' as WorkflowStatus // Will be updated when workflows are checked
-          }));
-          setSelectedRepositoriesState(repositoriesWithStatus);
+        const res = await fetch('/api/settings').catch(() => null);
+        if (res?.ok) {
+          const data = await res.json();
+          if (data.selectedRepos && Array.isArray(data.selectedRepos)) {
+            setSelectedRepositoriesState(data.selectedRepos);
+          }
+          if (data.lastOrg) {
+            setSelectedOrganization(data.lastOrg);
+          }
         }
-        
-        // Load last selected organization
-        const lastOrg = localStorage.getItem('github-flow-dashboard-last-org');
-        if (lastOrg && lastOrg !== 'null') {
-          setSelectedOrganizationState(lastOrg);
-        } else if (userId) {
-          // Default to user's personal repositories
-          setSelectedOrganizationState(userId);
-        }
-      } catch (err) {
-        console.error('Failed to load stored data:', err);
+      } catch {
+        // ignore — start with empty selection
       }
     }
+    loadFromServer();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    loadStoredData();
-  }, [userId]);
 
-
-  // Persist selected repositories to storage whenever they change
+  // Persist selected repositories to server settings whenever they change
   useEffect(() => {
-    async function saveSelectedRepositories() {
-      try {
-        if (selectedRepositories.length > 0) {
-          await setSecureItem(STORAGE_KEYS.SELECTED_REPOSITORIES, JSON.stringify(selectedRepositories));
-        }
-      } catch (err) {
-        console.error('Failed to save selected repositories:', err);
-      }
-    }
-
-    saveSelectedRepositories();
+    fetch('/api/settings').then(async (res) => {
+      const current = res.ok ? await res.json().catch(() => ({})) : {};
+      fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...current, selectedRepos: selectedRepositories }),
+      }).catch(() => { });
+    }).catch(() => { });
   }, [selectedRepositories]);
 
   // Background workflow checking function
@@ -186,7 +172,7 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
   }, []);
 
   const fetchRepositories = useCallback(async (owner?: string) => {
-    if (!token || !isValidated) {
+    if (!isValidated) {
       setError('Valid GitHub token required');
       return;
     }
@@ -203,7 +189,7 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
     setLoadingStatus('Fetching repositories...');
 
     try {
-      const apiClient = new GitHubApiClient(token, baseUrl);
+      const apiClient = new GitHubApiClient('', baseUrl);
       const allRepositories: Repository[] = [];
       let page = 1;
       const perPage = 100;
@@ -254,7 +240,7 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
       setIsLoading(false);
       setLoadingStatus(null);
     }
-  }, [token, isValidated, selectedOrganization, userId, baseUrl, checkWorkflowsInBackground, organizations]);
+  }, [isValidated, selectedOrganization, userId, baseUrl, checkWorkflowsInBackground, organizations]);
 
   const toggleRepository = useCallback((repository: RepositoryWithWorkflowStatus) => {
     // Only allow toggling repositories with workflows
@@ -285,7 +271,7 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
   }, []);
 
   const fetchOrganizations = useCallback(async () => {
-    if (!token || !isValidated || !userId) {
+    if (!isValidated || !userId) {
       return;
     }
 
@@ -293,14 +279,14 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
     setIsLoadingOrganizations(true);
 
     try {
-      const apiClient = new GitHubApiClient(token, baseUrl);
+      const apiClient = new GitHubApiClient('', baseUrl);
 
       // Get user info first
       const user = await apiClient.validateToken();
-      
+
       // Get organizations
       const orgs = await apiClient.getUserOrganizations();
-      
+
       // Create organization list with user first
       const allOrganizations: Organization[] = [
         {
@@ -316,16 +302,16 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
           type: 'Organization' as const
         }))
       ];
-      
+
       setOrganizations(allOrganizations);
       console.log(`[Repository Selection Context] Found ${allOrganizations.length} organizations`);
-      
+
     } catch (err) {
       console.error('[Repository Selection Context] Failed to fetch organizations:', err);
     } finally {
       setIsLoadingOrganizations(false);
     }
-  }, [token, isValidated, userId, baseUrl]);
+  }, [isValidated, userId, baseUrl]);
 
   const setSelectedOrganization = useCallback((org: string | null) => {
     setSelectedOrganizationState(org);
@@ -335,12 +321,15 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
     setLoadingStatus(null);
     setError(null);
     
-    // Save to localStorage
-    if (org) {
-      localStorage.setItem('github-flow-dashboard-last-org', org);
-    } else {
-      localStorage.removeItem('github-flow-dashboard-last-org');
-    }
+    // Persist last-org to server settings
+    fetch('/api/settings').then(async (res) => {
+      const current = res.ok ? await res.json().catch(() => ({})) : {};
+      fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...current, lastOrg: org ?? null }),
+      }).catch(() => { });
+    }).catch(() => { });
     
     // Fetch repositories for the new organization
     if (org) {
@@ -371,17 +360,17 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
 
   // Fetch organizations when token becomes available
   useEffect(() => {
-    if (token && isValidated && userId) {
+    if (isValidated && userId) {
       fetchOrganizations();
     }
-  }, [token, isValidated, userId, fetchOrganizations]);
+  }, [isValidated, userId, fetchOrganizations]);
 
   // Fetch repositories when organization is selected
   useEffect(() => {
-    if (token && isValidated && selectedOrganization) {
+    if (isValidated && selectedOrganization) {
       fetchRepositories(selectedOrganization);
     }
-  }, [token, isValidated, selectedOrganization, fetchRepositories]);
+  }, [isValidated, selectedOrganization, fetchRepositories]);
 
   const contextValue: RepositorySelectionContextType = {
     selectedRepositories,

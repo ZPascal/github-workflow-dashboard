@@ -59,7 +59,7 @@ interface RepositorySelectionProps {
 }
 
 export function RepositorySelection({ onSelectionChange }: RepositorySelectionProps) {
-  const { token, isValidated } = useGitHubToken();
+  const { isValidated } = useGitHubToken();
   const {
     selectedRepositories,
     availableRepositories,
@@ -89,11 +89,11 @@ export function RepositorySelection({ onSelectionChange }: RepositorySelectionPr
 
   // Auto-fetch repositories when token becomes available
   useEffect(() => {
-    if (token && isValidated && availableRepositories.length === 0 && !isLoading && !error) {
+    if (isValidated && availableRepositories.length === 0 && !isLoading && !error) {
       console.log('🚀 Auto-triggering repository fetch...');
       fetchRepositories();
     }
-  }, [token, isValidated, availableRepositories.length, isLoading, error, fetchRepositories]);
+  }, [isValidated, availableRepositories.length, isLoading, error, fetchRepositories]);
 
   const handleRepositoryToggle = useCallback((repository: RepositoryWithWorkflowStatus) => {
     const statusInfo = getWorkflowStatusInfo(repository.workflowStatus, repository.workflowCount);
@@ -139,7 +139,7 @@ export function RepositorySelection({ onSelectionChange }: RepositorySelectionPr
     return 0;
   });
 
-  if (!token || !isValidated) {
+  if (!isValidated) {
     return (
       <Card>
         <CardHeader>

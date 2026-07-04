@@ -1,254 +1,78 @@
-/**
- * GitHub Token Context
- * Manages GitHub token state and provides secure storage integration
- */
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { setSecureItem, getSecureItem, removeSecureItem, isSecureStorageAvailable, STORAGE_KEYS } from '@/lib/storage/secure-storage';
-import { validateGitHubToken } from '@/lib/api/token-validation';
 import { GITHUB_DEFAULT_BASE_URL } from '@/lib/api/github';
 
 interface GitHubTokenContextType {
-  token: string | null;
   isValidated: boolean;
   isLoading: boolean;
   error: string | null;
-  userId?: string | null;
+  userId: string | null;
   baseUrl: string;
-  setToken: (token: string) => Promise<void>;
+  setToken: (token: string, baseUrl?: string) => Promise<void>;
   removeToken: () => Promise<void>;
-  validateToken: () => Promise<boolean>;
-  isSecureStorageSupported: boolean;
-  setBaseUrl: (url: string) => Promise<void>;
 }
 
 const GitHubTokenContext = createContext<GitHubTokenContextType | undefined>(undefined);
 
-interface GitHubTokenProviderProps {
-  children: ReactNode;
-}
-
-export function GitHubTokenProvider({ children }: GitHubTokenProviderProps) {
-  const [token, setTokenState] = useState<string | null>(null);
+export function GitHubTokenProvider({ children }: { children: ReactNode }) {
   const [isValidated, setIsValidated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isSecureStorageSupported, setIsSecureStorageSupported] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [baseUrl, setBaseUrlState] = useState<string>(GITHUB_DEFAULT_BASE_URL);
+  const [baseUrl, setBaseUrl] = useState(GITHUB_DEFAULT_BASE_URL);
 
-  // Check secure storage availability on mount
+  // On mount, check for an existing session
   useEffect(() => {
-    setIsSecureStorageSupported(isSecureStorageAvailable());
+    fetch('/api/auth/session')
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          setUserId(data.userId);
+          setBaseUrl(data.baseUrl ?? GITHUB_DEFAULT_BASE_URL);
+          setIsValidated(true);
+        }
+      })
+      .catch(() => { /* no session, stay logged out */ })
+      .finally(() => setIsLoading(false));
   }, []);
 
-  // Load baseUrl from storage on mount
-  useEffect(() => {
-    async function loadStoredBaseUrl() {
-      try {
-        const stored = await getSecureItem(STORAGE_KEYS.GITHUB_BASE_URL);
-        if (stored) {
-          setBaseUrlState(stored);
-        }
-      } catch {
-        // ignore, use default
-      }
-    }
-    loadStoredBaseUrl();
-  }, []);
-
-  // Load token from secure storage on mount
-  useEffect(() => {
-    async function loadStoredToken() {
-      console.log('[GitHub Token Context] Loading stored token...');
-      if (!isSecureStorageSupported) {
-        console.log('[GitHub Token Context] Secure storage not supported, skipping token load');
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const storedToken = await getSecureItem(STORAGE_KEYS.GITHUB_TOKEN);
-        console.log('[GitHub Token Context] Stored token found:', !!storedToken);
-        
-        if (storedToken) {
-          setTokenState(storedToken);
-          // Validate the stored token
-          console.log('[GitHub Token Context] Validating stored token...');
-          const validation = await validateGitHubToken(storedToken, baseUrl);
-          console.log('[GitHub Token Context] Stored token validation result:', validation);
-          
-          setIsValidated(validation.isValid);
-          if (!validation.isValid) {
-            console.warn('[GitHub Token Context] Stored token is no longer valid');
-            setError('Stored token is no longer valid');
-          } else {
-            console.log('[GitHub Token Context] Stored token is valid');
-            // load stored userId if available
-            try {
-              const storedUserId = await getSecureItem(STORAGE_KEYS.GITHUB_USER_ID);
-              if (storedUserId) {
-                setUserId(storedUserId as string);
-              }
-            } catch (err) {
-              console.warn('[GitHub Token Context] Failed to load stored userId', err);
-            }
-          }
-        } else {
-          console.log('[GitHub Token Context] No stored token found');
-        }
-      } catch (err) {
-        console.error('[GitHub Token Context] Failed to load stored token:', err);
-        setError('Failed to load stored token');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadStoredToken();
-  }, [isSecureStorageSupported, baseUrl]);
-
-  const setToken = async (newToken: string): Promise<void> => {
-    console.log('[GitHub Token Context] Setting token...');
+  const setToken = async (token: string, newBaseUrl?: string): Promise<void> => {
     setError(null);
     setIsLoading(true);
-
     try {
-      // Validate the token first
-      console.log('[GitHub Token Context] Validating token...');
-      const validation = await validateGitHubToken(newToken, baseUrl);
-      console.log('[GitHub Token Context] Token validation result:', validation);
-      
-      if (!validation.isValid) {
-        console.error('[GitHub Token Context] Token validation failed:', validation.error);
-        throw new Error(validation.error || 'Invalid GitHub token');
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token, baseUrl: newBaseUrl }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Login failed');
       }
-
-      // Store the token securely if storage is available
-      if (isSecureStorageSupported) {
-        console.log('[GitHub Token Context] Storing token securely...');
-        await setSecureItem(STORAGE_KEYS.GITHUB_TOKEN, newToken);
-      } else {
-        console.log('[GitHub Token Context] Secure storage not available, token will not persist');
-      }
-
-      setTokenState(newToken);
+      const data = await res.json();
+      setUserId(data.userId);
+      setBaseUrl(data.baseUrl ?? GITHUB_DEFAULT_BASE_URL);
       setIsValidated(true);
-      // Fetch authenticated user id and store it
-      try {
-        const apiBase = (baseUrl || GITHUB_DEFAULT_BASE_URL).replace(/\/$/, '');
-        const res = await fetch(`${apiBase}/user`, {
-          headers: {
-            Authorization: `Bearer ${newToken}`,
-            Accept: 'application/vnd.github+json'
-          }
-        });
-
-        if (!res.ok) {
-          console.warn('[GitHub Token Context] Failed to fetch user info', res.status);
-        } else {
-          const data = await res.json();
-          const login = data && (data.login || data.id);
-          if (login) {
-            setUserId(login);
-            if (isSecureStorageSupported) {
-              await setSecureItem(STORAGE_KEYS.GITHUB_USER_ID, login);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('[GitHub Token Context] Error fetching user info', err);
-      }
-      console.log('[GitHub Token Context] Token successfully set and validated');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to set token';
-      console.error('[GitHub Token Context] Error setting token:', err);
-      setError(message);
-      throw new Error(message);
+      const msg = err instanceof Error ? err.message : 'Login failed';
+      setError(msg);
+      throw new Error(msg);
     } finally {
       setIsLoading(false);
     }
   };
 
   const removeToken = async (): Promise<void> => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => { });
+    setIsValidated(false);
+    setUserId(null);
+    setBaseUrl(GITHUB_DEFAULT_BASE_URL);
     setError(null);
-    
-    try {
-      if (isSecureStorageSupported) {
-        await removeSecureItem(STORAGE_KEYS.GITHUB_TOKEN);
-        await removeSecureItem(STORAGE_KEYS.GITHUB_USER_ID);
-      }
-      
-      setTokenState(null);
-      setUserId(null);
-      setIsValidated(false);
-    } catch (err) {
-      console.error('Failed to remove token:', err);
-      setError('Failed to remove token');
-    }
-  };
-
-  const validateToken = async (): Promise<boolean> => {
-    if (!token) {
-      setIsValidated(false);
-      return false;
-    }
-
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const validation = await validateGitHubToken(token, baseUrl);
-      setIsValidated(validation.isValid);
-
-      if (!validation.isValid) {
-        setError(validation.error || 'Token validation failed');
-      }
-
-      return validation.isValid;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Token validation failed';
-      setError(message);
-      setIsValidated(false);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const setBaseUrl = async (url: string): Promise<void> => {
-    const normalized = url.trim().replace(/\/$/, '') || GITHUB_DEFAULT_BASE_URL;
-    setBaseUrlState(normalized);
-    try {
-      if (isSecureStorageSupported) {
-        if (normalized === GITHUB_DEFAULT_BASE_URL) {
-          removeSecureItem(STORAGE_KEYS.GITHUB_BASE_URL);
-        } else {
-          await setSecureItem(STORAGE_KEYS.GITHUB_BASE_URL, normalized);
-        }
-      }
-    } catch {
-      // ignore storage errors
-    }
-  };
-
-  const contextValue: GitHubTokenContextType = {
-    token,
-    isValidated,
-    isLoading,
-    error,
-    userId,
-    baseUrl,
-    setToken,
-    removeToken,
-    validateToken,
-    isSecureStorageSupported,
-    setBaseUrl,
   };
 
   return (
-    <GitHubTokenContext.Provider value={contextValue}>
+    <GitHubTokenContext.Provider value={{ isValidated, isLoading, error, userId, baseUrl, setToken, removeToken }}>
       {children}
     </GitHubTokenContext.Provider>
   );
@@ -256,8 +80,6 @@ export function GitHubTokenProvider({ children }: GitHubTokenProviderProps) {
 
 export function useGitHubToken(): GitHubTokenContextType {
   const context = useContext(GitHubTokenContext);
-  if (context === undefined) {
-    throw new Error('useGitHubToken must be used within a GitHubTokenProvider');
-  }
+  if (!context) throw new Error('useGitHubToken must be used within GitHubTokenProvider');
   return context;
 }

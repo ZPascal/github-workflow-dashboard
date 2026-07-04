@@ -35,7 +35,7 @@ interface WorkflowProviderProps {
 }
 
 export function WorkflowProvider({ children }: WorkflowProviderProps) {
-  const { token, isValidated, baseUrl } = useGitHubToken();
+  const { isValidated, baseUrl } = useGitHubToken();
   const { selectedRepositories } = useRepositorySelection();
   const { settings } = useDisplaySettings();
   
@@ -70,7 +70,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
 
   // Refresh workflows for a specific repository
   const refreshRepository = useCallback(async (repositoryId: number) => {
-    if (!token || !isValidated) return;
+    if (!isValidated) return;
 
     const repositoryWorkflow = repositoryWorkflows.find(rw => rw.repository.id === repositoryId);
     if (!repositoryWorkflow) return;
@@ -84,9 +84,9 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     );
 
     try {
-      const apiClient = new GitHubApiClient(token, baseUrl);
+      const apiClient = new GitHubApiClient('', baseUrl);
       const [owner, repo] = repositoryWorkflow.repository.full_name.split('/');
-      
+
       console.log(`[Workflow Context] 🚀 Fetching current workflow statuses for ${owner}/${repo}...`);
       // Use getLatestWorkflowStatuses to get only the CURRENT status per workflow
       const workflowStatuses = await apiClient.getLatestWorkflowStatuses(owner, repo, {
@@ -123,11 +123,11 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
         )
       );
     }
-  }, [token, isValidated, baseUrl, repositoryWorkflows]);
+  }, [isValidated, baseUrl, repositoryWorkflows]);
 
   // Refresh all workflows
   const refreshWorkflows = useCallback(async () => {
-    if (!token || !isValidated || repositoryWorkflows.length === 0) return;
+    if (!isValidated || repositoryWorkflows.length === 0) return;
 
     setIsLoading(true);
     setError(null);
@@ -135,7 +135,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     console.log(`[Workflow Context] 🔄 Refreshing workflows for ${repositoryWorkflows.length} repositories...`);
 
     try {
-      const apiClient = new GitHubApiClient(token, baseUrl);
+      const apiClient = new GitHubApiClient('', baseUrl);
 
       // Fetch workflows for all selected repositories in parallel
       const promises = repositoryWorkflows.map(async (rw) => {
@@ -189,7 +189,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [token, isValidated, baseUrl, repositoryWorkflows]);
+  }, [isValidated, baseUrl, repositoryWorkflows]);
 
   // Auto refresh workflows
   useEffect(() => {
@@ -205,17 +205,17 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
 
   // Initial load when repositories become available
   useEffect(() => {
-    if (token && isValidated && repositoryWorkflows.length > 0) {
+    if (isValidated && repositoryWorkflows.length > 0) {
       // Only fetch if we haven't loaded data for any repository yet
-      const hasUnloadedRepos = repositoryWorkflows.some(rw => 
+      const hasUnloadedRepos = repositoryWorkflows.some(rw =>
         rw.workflows.length === 0 && !rw.isLoading && !rw.error
       );
-      
+
       if (hasUnloadedRepos) {
         refreshWorkflows();
       }
     }
-  }, [token, isValidated, repositoryWorkflows, refreshWorkflows]);
+  }, [isValidated, repositoryWorkflows, refreshWorkflows]);
 
   const value: WorkflowContextType = {
     repositoryWorkflows,
