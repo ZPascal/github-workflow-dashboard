@@ -63,6 +63,7 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
   const [error, setError] = useState<string | null>(null);
   const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
   const [nameFilter, setNameFilterState] = useState<string>('');
+  const isReposLoadedRef = React.useRef(false);
 
   // Load selected repositories and last organization from server settings on mount
   useEffect(() => {
@@ -80,6 +81,8 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
         }
       } catch {
         // ignore — start with empty selection
+      } finally {
+        isReposLoadedRef.current = true;
       }
     }
     loadFromServer();
@@ -89,6 +92,7 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
 
   // Persist selected repositories to server settings whenever they change
   useEffect(() => {
+    if (!isReposLoadedRef.current) return; // Don't overwrite server data on mount
     fetch('/api/settings').then(async (res) => {
       const current = res.ok ? await res.json().catch(() => ({})) : {};
       fetch('/api/settings', {

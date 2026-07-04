@@ -65,22 +65,37 @@ async function persistSettings(settings: DisplaySettings): Promise<void> {
 
 export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<DisplaySettings>(DEFAULT_SETTINGS);
+  const settingsLoadedRef = React.useRef(false);
 
   useEffect(() => {
     fetchSettings().then((saved) => {
-      if (Object.keys(saved).length > 0) {
-        setSettings((prev) => ({ ...prev, ...saved }));
+      if (!settingsLoadedRef.current) {
+        // Only apply if user hasn't touched settings yet
+        if (Object.keys(saved).length > 0) {
+          setSettings((prev) => ({ ...prev, ...saved }));
+        }
+        settingsLoadedRef.current = true;
       }
     });
   }, []);
 
   const updateSettings = (updates: Partial<DisplaySettings>) => {
-    const newSettings = { ...settings, ...updates };
-    setSettings(newSettings);
-    persistSettings(newSettings);
+    settingsLoadedRef.current = true; // User action marks us as loaded
+    setSettings((prev) => {
+      const newSettings = { ...prev, ...updates };
+      persistSettings(newSettings);
+      return newSettings;
+    });
   };
 
-  const toggleCompactMode = () => updateSettings({ compactMode: !settings.compactMode });
+  const toggleCompactMode = () => {
+    settingsLoadedRef.current = true;
+    setSettings((prev) => {
+      const newSettings = { ...prev, compactMode: !prev.compactMode };
+      persistSettings(newSettings);
+      return newSettings;
+    });
+  };
   const setRefreshInterval = (interval: RefreshInterval) => updateSettings({ refreshInterval: interval });
   const setDashboardName = (name: string) => updateSettings({ dashboardName: name });
   const getRefreshIntervalLabel = (interval: RefreshInterval) =>
