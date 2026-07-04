@@ -28,16 +28,24 @@ export async function POST(req: NextRequest) {
   const user = await validation.json();
   const githubUserId: string = user.login;
 
-  storeToken(githubUserId, token, resolvedBaseUrl);
-  const sessionId = createSession(githubUserId);
+  if (typeof githubUserId !== 'string' || githubUserId.length === 0) {
+    return NextResponse.json({ error: 'Unexpected GitHub API response' }, { status: 502 });
+  }
 
-  const res = NextResponse.json({ userId: githubUserId, baseUrl: resolvedBaseUrl });
-  res.cookies.set('gwd_session', sessionId, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/',
-    maxAge: 86400,
-  });
-  return res;
+  try {
+    storeToken(githubUserId, token, resolvedBaseUrl);
+    const sessionId = createSession(githubUserId);
+
+    const res = NextResponse.json({ userId: githubUserId, baseUrl: resolvedBaseUrl });
+    res.cookies.set('gwd_session', sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 86400,
+    });
+    return res;
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }

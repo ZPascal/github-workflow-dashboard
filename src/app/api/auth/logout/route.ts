@@ -7,6 +7,12 @@ export async function POST(req: NextRequest) {
     deleteSession(sessionId);
   }
   const res = NextResponse.json({ ok: true });
-  res.cookies.set('gwd_session', '', { maxAge: 0, path: '/' });
+  res.cookies.set('gwd_session', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+    maxAge: 0,
+  });
   return res;
 }
