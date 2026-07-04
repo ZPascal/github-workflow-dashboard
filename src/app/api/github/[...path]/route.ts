@@ -12,22 +12,28 @@ async function proxyRequest(req: NextRequest, context: RouteContext): Promise<Ne
 
   const tokenData = getToken(githubUserId);
   if (!tokenData) {
-    return NextResponse.json({ error: 'Token not found' }, { status: 500 });
+    return NextResponse.json({ error: 'Token not found, please re-authenticate' }, { status: 401 });
   }
 
   const { path } = await context.params;
   const url = new URL(req.url);
   const githubUrl = `${tokenData.baseUrl}/${path.join('/')}${url.search}`;
 
-  const upstreamRes = await fetch(githubUrl, {
-    method: req.method,
-    headers: {
-      Authorization: `Bearer ${tokenData.token}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-    body: ['POST', 'PATCH', 'PUT'].includes(req.method) ? req.body : undefined,
-  });
+  let upstreamRes: Response;
+  try {
+    upstreamRes = await fetch(githubUrl, {
+      method: req.method,
+      headers: {
+        Authorization: `Bearer ${tokenData.token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...(req.headers.get('content-type') ? { 'Content-Type': req.headers.get('content-type')! } : {}),
+      },
+      body: ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method) ? await req.text() : undefined,
+    });
+  } catch {
+    return NextResponse.json({ error: 'GitHub API unreachable' }, { status: 502 });
+  }
 
   const responseHeaders = new Headers();
   upstreamRes.headers.forEach((value, key) => {
@@ -46,3 +52,4 @@ export const GET = proxyRequest;
 export const POST = proxyRequest;
 export const PATCH = proxyRequest;
 export const DELETE = proxyRequest;
+export const PUT = proxyRequest;
