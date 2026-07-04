@@ -2,9 +2,11 @@ import crypto from 'crypto';
 import db, { encryptionKey } from './index';
 
 const ALGO = 'aes-256-gcm';
+const IV_LEN = 12;
+const TAG_LEN = 16;
 
 function encrypt(plaintext: string): string {
-  const iv = crypto.randomBytes(12);
+  const iv = crypto.randomBytes(IV_LEN);
   const cipher = crypto.createCipheriv(ALGO, encryptionKey, iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
@@ -13,12 +15,12 @@ function encrypt(plaintext: string): string {
 
 function decrypt(ciphertext: string): string {
   const buf = Buffer.from(ciphertext, 'base64');
-  const iv = buf.subarray(0, 12);
-  const authTag = buf.subarray(12, 28);
-  const encrypted = buf.subarray(28);
+  const iv = buf.subarray(0, IV_LEN);
+  const authTag = buf.subarray(IV_LEN, IV_LEN + TAG_LEN);
+  const encrypted = buf.subarray(IV_LEN + TAG_LEN);
   const decipher = crypto.createDecipheriv(ALGO, encryptionKey, iv);
   decipher.setAuthTag(authTag);
-  return decipher.update(encrypted) + decipher.final('utf8');
+  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
 }
 
 export function storeToken(githubUserId: string, token: string, baseUrl: string): void {
@@ -38,18 +40,26 @@ export function getToken(githubUserId: string): { token: string; baseUrl: string
     'SELECT encrypted_token, base_url FROM user_tokens WHERE github_user_id = ?'
   ).get(githubUserId) as { encrypted_token: string; base_url: string } | undefined;
   if (!row) return null;
-  return { token: decrypt(row.encrypted_token), baseUrl: row.base_url };
+  try {
+    return { token: decrypt(row.encrypted_token), baseUrl: row.base_url };
+  } catch {
+    return null;
+  }
 }
 
-export function getSettings(githubUserId: string): object | null {
+export function getSettings(githubUserId: string): Record<string, unknown> | null {
   const row = db.prepare(
     'SELECT settings_json FROM user_settings WHERE github_user_id = ?'
   ).get(githubUserId) as { settings_json: string } | undefined;
   if (!row) return null;
-  return JSON.parse(row.settings_json);
+  try {
+    return JSON.parse(row.settings_json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
-export function saveSettings(githubUserId: string, settings: object): void {
+export function saveSettings(githubUserId: string, settings: Record<string, unknown>): void {
   db.prepare(`
     INSERT INTO user_settings (github_user_id, settings_json, updated_at)
     VALUES (?, ?, ?)
