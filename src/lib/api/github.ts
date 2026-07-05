@@ -46,6 +46,12 @@ export class GitHubApiClient {
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        // Notify the auth context to clear the session
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('gwd:unauthorized'));
+        }
+      }
       let errorMessage = `GitHub API Error: ${response.status}`;
       try {
         const errorData = await response.json();

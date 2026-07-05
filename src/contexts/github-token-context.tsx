@@ -71,6 +71,16 @@ export function GitHubTokenProvider({ children }: { children: ReactNode }) {
     setError(null);
   };
 
+  // Listen for 401 responses from the API proxy and reset auth state
+  const removeTokenRef = React.useRef(removeToken);
+  removeTokenRef.current = removeToken;
+
+  useEffect(() => {
+    const handleUnauthorized = () => removeTokenRef.current();
+    window.addEventListener('gwd:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('gwd:unauthorized', handleUnauthorized);
+  }, []); // empty deps, ref stays current
+
   return (
     <GitHubTokenContext.Provider value={{ isValidated, isLoading, error, userId, baseUrl, setToken, removeToken }}>
       {children}
