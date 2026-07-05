@@ -5,5 +5,12 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NODE_ENV: production
+      - NODE_ENV=production
+      - GWD_DB_PATH=/data/gwd.db
+      - GWD_ENCRYPTION_KEY=${GWD_ENCRYPTION_KEY}
+    volumes:
+      - gwd_data:/data
     restart: unless-stopped
+
+volumes:
+  gwd_data:

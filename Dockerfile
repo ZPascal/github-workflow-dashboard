@@ -1,7 +1,7 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --frozen-lockfile
+RUN npm ci
 COPY . .
 RUN npm run build
 
@@ -19,6 +19,8 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
 
+ENV GWD_DB_PATH=/data/gwd.db
+RUN mkdir -p /data
 VOLUME /data
 EXPOSE 3000
 CMD ["npm", "start"]
