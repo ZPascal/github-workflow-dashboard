@@ -48,11 +48,10 @@ describe('GitHubApiClient', () => {
       const result = await client.validateToken();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/user',
+        '/api/github/user',
         expect.objectContaining({
           headers: expect.objectContaining({
             'Accept': 'application/vnd.github+json',
-            'Authorization': 'Bearer test-token',
             'X-GitHub-Api-Version': '2022-11-28'
           })
         })
@@ -109,7 +108,7 @@ describe('GitHubApiClient', () => {
       const result = await client.getRepositories('testuser', true);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/users/testuser/repos?',
+        '/api/github/users/testuser/repos?',
         expect.any(Object)
       );
       
@@ -129,7 +128,7 @@ describe('GitHubApiClient', () => {
       await client.getRepositories('test-org', false);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/orgs/test-org/repos?',
+        '/api/github/orgs/test-org/repos?',
         expect.any(Object)
       );
     });
@@ -151,7 +150,7 @@ describe('GitHubApiClient', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/orgs/test-org/repos?type=owner&sort=updated&direction=desc&per_page=50&page=1',
+        '/api/github/orgs/test-org/repos?type=owner&sort=updated&direction=desc&per_page=50&page=1',
         expect.any(Object)
       );
     });
@@ -183,7 +182,7 @@ describe('GitHubApiClient', () => {
       const result = await client.getWorkflows('testuser', 'test-repo');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/repos/testuser/test-repo/actions/workflows',
+        '/api/github/repos/testuser/test-repo/actions/workflows',
         expect.any(Object)
       );
       
@@ -243,7 +242,7 @@ describe('GitHubApiClient', () => {
       const result = await client.getWorkflowRuns('testuser', 'test-repo');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/repos/testuser/test-repo/actions/runs?',
+        '/api/github/repos/testuser/test-repo/actions/runs?',
         expect.any(Object)
       );
       
@@ -266,7 +265,7 @@ describe('GitHubApiClient', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/repos/testuser/test-repo/actions/runs?branch=main&status=completed&per_page=10&page=1',
+        '/api/github/repos/testuser/test-repo/actions/runs?branch=main&status=completed&per_page=10&page=1',
         expect.any(Object)
       );
     });
@@ -292,7 +291,7 @@ describe('GitHubApiClient', () => {
       const result = await client.getRateLimit();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.github.com/rate_limit',
+        '/api/github/rate_limit',
         expect.any(Object)
       );
       

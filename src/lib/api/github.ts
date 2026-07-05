@@ -23,22 +23,23 @@ export class GitHubApiClient {
   private baseUrl: string;
   private token: string;
 
-  constructor(token: string, baseUrl?: string) {
-    this.token = token;
-    this.baseUrl = (baseUrl || GITHUB_DEFAULT_BASE_URL).replace(/\/$/, '');
+  constructor(token?: string, baseUrl?: string) {
+    // token and baseUrl are unused — authentication is handled by the server-side proxy
+    this.token = token ?? '';
+    this.baseUrl = baseUrl ?? GITHUB_DEFAULT_BASE_URL;
   }
 
   private async makeRequest<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<GitHubApiResponse<T>> {
-    const url = `${this.baseUrl}${endpoint}`;
-    
+    // Route all requests through the server-side proxy — token is handled server-side
+    const url = `/api/github${endpoint}`;
+
     const response = await fetch(url, {
       ...options,
       headers: {
         'Accept': 'application/vnd.github+json',
-        'Authorization': `Bearer ${this.token}`,
         'X-GitHub-Api-Version': '2022-11-28',
         ...options.headers,
       },
@@ -46,18 +47,13 @@ export class GitHubApiClient {
 
     if (!response.ok) {
       let errorMessage = `GitHub API Error: ${response.status}`;
-      
       try {
         const errorData = await response.json();
         errorMessage = errorData.message || errorMessage;
-      } catch {
-        // If we can't parse the error response, use the default message
-      }
-      
+      } catch { }
       throw new GitHubApiError(errorMessage, response.status, response);
     }
 
-    // Extract rate limit information from headers (with null safety)
     const rateLimit = {
       limit: parseInt(response.headers?.get('X-RateLimit-Limit') || '0'),
       remaining: parseInt(response.headers?.get('X-RateLimit-Remaining') || '0'),
@@ -66,18 +62,9 @@ export class GitHubApiClient {
 
     const data = await response.json();
     const headers: Record<string, string> = {};
-    if (response.headers) {
-      response.headers.forEach((value, key) => {
-        headers[key] = value;
-      });
-    }
+    response.headers?.forEach((value, key) => { headers[key] = value; });
 
-    return {
-      data,
-      status: response.status,
-      headers,
-      rateLimit,
-    };
+    return { data, status: response.status, headers, rateLimit };
   }
 
   // Validate token by making a test API call
