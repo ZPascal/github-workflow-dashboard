@@ -66,7 +66,12 @@ export class GitHubApiClient {
       reset: parseInt(response.headers?.get('X-RateLimit-Reset') || '0'),
     };
 
-    const data = await response.json();
+    let data: T;
+    try {
+      data = await response.json();
+    } catch {
+      throw new GitHubApiError(`GitHub API Error: invalid JSON response`, response.status, response);
+    }
     const headers: Record<string, string> = {};
     response.headers?.forEach((value, key) => { headers[key] = value; });
 

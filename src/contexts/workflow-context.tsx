@@ -197,7 +197,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
     if (refreshInterval <= 0 || repositoryWorkflows.length === 0) return;
 
     const interval = setInterval(() => {
-      refreshWorkflows();
+      refreshWorkflows().catch(() => {});
     }, refreshInterval);
 
     return () => clearInterval(interval);
@@ -212,7 +212,7 @@ export function WorkflowProvider({ children }: WorkflowProviderProps) {
       );
 
       if (hasUnloadedRepos) {
-        refreshWorkflows();
+        refreshWorkflows().catch(() => {});
       }
     }
   }, [isValidated, repositoryWorkflows, refreshWorkflows]);

@@ -365,14 +365,14 @@ export function RepositorySelectionProvider({ children }: RepositorySelectionPro
   // Fetch organizations when token becomes available
   useEffect(() => {
     if (isValidated && userId) {
-      fetchOrganizations();
+      fetchOrganizations().catch(() => {});
     }
   }, [isValidated, userId, fetchOrganizations]);
 
   // Fetch repositories when organization is selected
   useEffect(() => {
     if (isValidated && selectedOrganization) {
-      fetchRepositories(selectedOrganization);
+      fetchRepositories(selectedOrganization).catch(() => {});
     }
   }, [isValidated, selectedOrganization, fetchRepositories]);
 
